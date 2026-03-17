@@ -3,41 +3,39 @@ import { Workflow, LogOut, User, Activity, Container, GitBranch, Terminal, Shiel
 import { signOut, useSession } from 'next-auth/react';
 import { useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link'; // 1. IMPORT LINK
 
 const Navbar = () => {
   const { data: session } = useSession();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Define nav items for cleaner mapping
+  // 2. STRIP THE (features) FOLDER FROM THE URLS
   const navItems = [
-    {id: 'github_repos', icon: <Library size={24} strokeWidth={1.5} />, label: 'GITHUB_REPOS'},
-    { id: 'monitors', icon: <Activity size={24} strokeWidth={1.5} />, label: 'MONITORS' },
-    { id: 'instances', icon: <Container size={24} strokeWidth={1.5} />, label: 'INSTANCES' },
-    { id: 'pipelines', icon: <GitBranch size={24} strokeWidth={1.5} />, label: 'PIPELINES' },
-    { id: 'console', icon: <Terminal size={24} strokeWidth={1.5} />, label: 'CONSOLE' },
-    { id: 'security', icon: <ShieldAlert size={24} strokeWidth={1.5} />, label: 'SECURITY' },
+    { id: 'dashboard', icon: <Activity size={24} strokeWidth={1.5} />, label: 'DASHBOARD', url: "/dashboard"},
+    { id: 'github_repos', icon: <Library size={24} strokeWidth={1.5} />, label: 'GITHUB_REPOS', url: "/gitRepo"},
+    { id: 'instances', icon: <Container size={24} strokeWidth={1.5} />, label: 'INSTANCES', url: "/container"},
+    { id: 'pipelines', icon: <GitBranch size={24} strokeWidth={1.5} />, label: 'PIPELINES', url: "/pipelines" },
+    { id: 'console', icon: <Terminal size={24} strokeWidth={1.5} />, label: 'CONSOLE', url: "/console" },
+    { id: 'security', icon: <ShieldAlert size={24} strokeWidth={1.5} />, label: 'SECURITY', url: "#" }, // Placeholder for now
   ];
 
   return (
     <nav className="fixed left-0 z-40 bg-zinc-950 w-12 sm:w-16 md:w-16 lg:w-18 h-screen py-6 flex flex-col items-center border-r border-zinc-800">
-      {/* Brand Logo */}
-      <button
-        className="cursor-pointer hover:scale-110 transition-transform mb-6"
-        onClick={() => session && (window.location.href = '/dashboard')}
-      >
-        {session ? <LayoutDashboard className="w-8 h-8 text-white" /> :
+      
+      {/* Brand Logo - Changed to Link */}
+      <Link href="/" className="cursor-pointer hover:scale-110 transition-transform mb-6">
         <Workflow className="w-8 h-8 text-white" />
-}
-      </button>
+      </Link>
 
       <div className="w-full border-t border-zinc-800 pt-8 flex flex-col items-center h-full justify-between">
         {session ? (
           <>
-            {/* Functional Icons Group */}
             <div className="flex flex-col gap-8 w-full items-center">
+              {/* 3. CHANGE BUTTON TO LINK */}
               {navItems.map((item) => (
-                <button
+                <Link
                   key={item.id}
+                  href={item.url}
                   className="group relative flex items-center justify-center w-full text-zinc-500 hover:text-white transition-colors duration-200"
                 >
                   {item.icon}
@@ -49,7 +47,7 @@ const Navbar = () => {
                   
                   {/* Active Indicator Line */}
                   <div className="absolute left-0 w-0.5 h-0 bg-white transition-all duration-300 group-hover:h-6" />
-                </button>
+                </Link>
               ))}
             </div>
 
@@ -98,7 +96,6 @@ const Navbar = () => {
             </div>
           </>
         ) : (
-          /* Welcome Text Vertically */
           <div className="flex flex-col gap-1 items-center font-bold font-orbitron text-[10px] text-zinc-100 select-none tracking-tighter opacity-40">
             {"WELCOME".split("").map((char, i) => (
               <span key={i} className="leading-none">{char}</span>

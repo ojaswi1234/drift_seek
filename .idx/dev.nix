@@ -10,6 +10,9 @@
     pkgs.nodePackages.pnpm
     pkgs.bun
     pkgs.python3
+    pkgs.docker
+    pkgs.redis
+    pkgs.jenkins
   ];
   # Sets environment variables in the workspace
   env = {};

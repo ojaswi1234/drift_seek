@@ -3,6 +3,12 @@ import { Geist, Geist_Mono, Orbitron } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
 import Navbar from "@/components/Navbar";
+import nextFontLocal from 'next/font/local';
+
+const consolas = nextFontLocal({
+  src: '../public/fonts/Consolas.ttf',
+  variable: '--font-consolas',
+});
 
 
 const geistSans = Geist({
@@ -31,7 +37,7 @@ export default function RootLayout({children}: Readonly<{children: React.ReactNo
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable} antialiased overflow-x-hidden`}
+        className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable} ${consolas.variable} antialiased overflow-x-hidden`}
       >
         
         <Providers>
