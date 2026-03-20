@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.2.2",
     "@types/animejs": "^3.1.13",
     "animejs": "^3.2.1",
     "lucide-react": "^0.577.0",
@@ -19,6 +20,7 @@
     "nodemailer": "^7.0.13",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "redis": "^5.11.0",
     "split-type": "^0.3.4",
     "styled-components": "^6.3.11"
   },

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import NextAuth, { AuthOptions, Profile, Session } from "next-auth"
 import GithubProvider from "next-auth/providers/github"
 import { JWT } from "next-auth/jwt";
