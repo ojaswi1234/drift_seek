@@ -14,7 +14,7 @@ type StatusObject = {
 };
 
 function Page() {
-  const [data, setData] = useState(null);
+ 
   const [checking, setChecking] = useState(false);
   const [isstatus, setStatus] = useState<StatusObject | string | null>(null);
   const urlRef = useRef<HTMLInputElement>(null);
@@ -67,7 +67,14 @@ function Page() {
     if (status === "authenticated") {
       fetch("/api/github/repos")
         .then((res) => res.json())
-        .then((data) => setGithubData(data.total_count))
+        .then((data) => {
+          const repoCount = Array.isArray(data)
+            ? data.length
+            : typeof data?.total_count === "number"
+              ? data.total_count
+              : 0;
+          setGithubData(repoCount);
+        })
         .catch((err) => {
           console.error("Failed to fetch GitHub repos:", err);
           setGithubData(0);
@@ -80,7 +87,7 @@ function Page() {
   }
 
   return (
-    <div className="flex-1 min-h-screen bg-white py-10 px-6 md:px-12 lg:px-44 overflow-y-auto">
+    <div className="flex-1 min-h-screen bg-white py-10 px-6 md:px-12 lg:px-44 overflow-y-auto scrollbtn">
       <div className="w-full border border-zinc-800 bg-zinc-950 p-6 md:p-10 shadow-2xl transition-all">
         {/* Input Section */}
         <div className="w-full md:w-3/4 flex flex-row items-center border-b border-zinc-800 group focus-within:border-white transition-colors">
@@ -169,17 +176,27 @@ function Page() {
           )}
         </div>
       </div>
-      <div className="w-full h-full grid md:grid-cols-2 justify-center items-center mt-10 gap-6">
-        <div className="bg-zinc-600/20 justify-center flex flex-col items-center gap-2 font-orbitron p-16">
-       
-          <span className="text-3xl">{githubData}</span>
-          <span className="font-bold">GITHUB Repos</span>
+      <div className="w-full h-full grid md:grid-cols-2 justify-center items-center mt-10 gap-6 text-black">
+
+        {/* GitHub Repos Section */}
+        <div className="bg-zinc-600/20 justify-center flex flex-col items-center gap-2 font-orbitron p-16 ">
+          <span className="text-3xl font-bold">{githubData}</span>
+          <span className="">GITHUB Repos</span>
         </div>
-        <div className="bg-zinc-600/20 justify-center flex flex-col items-center gap-2 font-orbitron p-16">
-          
-          <span className="text-3xl">0</span>
-          <span className="font-bold">Containers</span>
+
+          {/* Containers Section (Placeholder) */}
+        <div className="bg-zinc-600/20 justify-center flex flex-col items-center gap-2 font-orbitron p-16 ">
+          <span className="text-3xl font-bold">0</span>
+          <span className="">Containers</span>
         </div>
+
+          {/* Pipelines Section (Placeholder) */}
+        <div className="bg-zinc-600/20 justify-center flex flex-col items-center gap-2 font-orbitron p-16 ">
+          <span className="text-3xl font-bold">0</span>
+          <span className="">Pipelines</span>
+        </div>
+
+
       </div>
     </div>
   );

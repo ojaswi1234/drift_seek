@@ -25,3 +25,11 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+.scrollbtn{
+  scrollbar-width: none;
+}
+
+.scrollbtn::-webkit-scrollbar {
+  scrollbar-width: none;
+}
