@@ -2,7 +2,7 @@
 import { useSession } from "next-auth/react";
 import React, { useEffect, useRef, useState } from "react";
 import { redirect } from "next/navigation";
-import { Search, Terminal, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Search, Terminal, AlertTriangle, CheckCircle2, Activity, Bot } from "lucide-react";
 import GlobalLoader from "@/components/GlobalLoader";
 
 // Updated type to include the diagnostic trace
@@ -97,7 +97,7 @@ function Page() {
           />
           <input
             type="text"
-            placeholder="ENTER_TARGET_URL TO CHECK LIVE STATUS..."
+            placeholder="ENTER_TARGET_URL // DRIFTSEEKER LIVE MONITOR..."
             ref={urlRef}
             onKeyDown={handleKeyDown}
             onChange={handleInputChange}
@@ -176,27 +176,28 @@ function Page() {
           )}
         </div>
       </div>
-      <div className="w-full h-full grid md:grid-cols-2 justify-center items-center mt-10 gap-6 text-black">
+      <div className="w-full h-full grid md:grid-cols-3 justify-center items-center mt-10 gap-6 text-black">
 
-        {/* GitHub Repos Section */}
-        <div className="bg-zinc-600/20 justify-center flex flex-col items-center gap-2 font-orbitron p-16 ">
+        {/* Drift Engine / GitHub Repos Section */}
+        <div className="bg-zinc-600/20 justify-center flex flex-col items-center gap-2 font-orbitron p-8 md:p-12 hover:bg-zinc-600/30 transition-all cursor-crosshair group">
+          <Search className="mb-2 text-zinc-500 group-hover:text-black transition-colors" />
           <span className="text-3xl font-bold">{githubData}</span>
-          <span className="">GITHUB Repos</span>
+          <span className="text-xs uppercase tracking-widest text-zinc-600 group-hover:text-black">Drift Source (GitHub)</span>
         </div>
 
-          {/* Containers Section (Placeholder) */}
-        <div className="bg-zinc-600/20 justify-center flex flex-col items-center gap-2 font-orbitron p-16 ">
+        {/* Uptime Monitors / Containers Section */}
+        <div className="bg-zinc-600/20 justify-center flex flex-col items-center gap-2 font-orbitron p-8 md:p-12 hover:bg-zinc-600/30 transition-all cursor-crosshair group">
+          <Activity className="mb-2 text-zinc-500 group-hover:text-green-600 transition-colors" />
           <span className="text-3xl font-bold">0</span>
-          <span className="">Containers</span>
+          <span className="text-xs uppercase tracking-widest text-zinc-600 group-hover:text-black">Active Monitors</span>
         </div>
 
-          {/* Pipelines Section (Placeholder) */}
-        <div className="bg-zinc-600/20 justify-center flex flex-col items-center gap-2 font-orbitron p-16 ">
+        {/* Automation / Pipelines Section */}
+        <div className="bg-zinc-600/20 justify-center flex flex-col items-center gap-2 font-orbitron p-8 md:p-12 hover:bg-zinc-600/30 transition-all cursor-crosshair group">
+          <Bot className="mb-2 text-zinc-500 group-hover:text-blue-600 transition-colors" />
           <span className="text-3xl font-bold">0</span>
-          <span className="">Pipelines</span>
+          <span className="text-xs uppercase tracking-widest text-zinc-600 group-hover:text-black">Jenkins Jobs</span>
         </div>
-
-
       </div>
     </div>
   );

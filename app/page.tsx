@@ -1,46 +1,25 @@
 "use client";
-import Navbar from "@/components/Navbar";
-import { useEffect, useRef } from "react";
+import React from "react";
 import {
   Container,
   Users,
-  Activity,
-  GitBranch,
-  Eye,
-  ShieldCheck,
+  Activity, // Uptime Monitor
+ // Drift / Automated Fixes
+  Terminal, // Web Shell
+  ShieldCheck, // Security
+  Zap, // Redis Speed
+  Bot, // Automated Fixes (Jenkins) alternative
+  Search, // Drift Detection
 } from "lucide-react";
 import LoginBtn from "@/components/login-btn";
 import { useSession } from "next-auth/react";
 
 export default function Home() {
-  const heading = useRef<HTMLHeadingElement>(null);
-
-  useEffect(() => {
-    if (heading.current) {
-      const finalText = "Welcome to System_Seek";
-      const chars = "!<>-_/[]{}—=+*^?#"; // smaller pool
-      let frame = 0;
-
-      const interval = setInterval(() => {
-        const output = finalText
-          .split("")
-          .map((letter, i) => {
-            // resolve faster: after ~10 frames, lock each letter
-            return frame > i * 2
-              ? letter
-              : chars[Math.floor(Math.random() * chars.length)];
-          })
-          .join("");
-
-        heading.current!.innerText = output;
-
-        frame++;
-        if (frame > finalText.length * 2) clearInterval(interval);
-      }, 40); // faster update speed
-    }
-
   
-  }, []);
+  const text = "DriftSeeker: DevOps Guardian";
+  // Animation delay calculation logic
+  const getDelay = (index: number) => index * 0.05;
+
 
 
   const {data: session} = useSession()
@@ -48,40 +27,40 @@ export default function Home() {
 
   const cardsData = [
     {
-      icon: <Container size={28} strokeWidth={1.5} />,
-      title: "Docker Ready",
-      content:
-        "Seamless orchestration with fully configured Docker and docker-compose environments for reliable, isolated deployments.",
-    },
-    {
-      icon: <Users size={28} strokeWidth={1.5} />,
-      title: "Multi-Tenant",
-      content:
-        "Secure, concurrent user support featuring isolated, session-based MongoDB connection pools with automatic resource cleanup.",
-    },
-    {
       icon: <Activity size={28} strokeWidth={1.5} />,
-      title: "Health Monitor",
+      title: "Live Uptime Monitor",
       content:
-        "Automated uptime tracking, HTTP response logging, and historical status snapshots for all configured server instances.",
+        "Instantly detects when critical services go offline. Powered by Node.js & Nodemailer to alert admins the second a heartbeat is missed.",
     },
     {
-      icon: <GitBranch size={28} strokeWidth={1.5} />,
-      title: "CI/CD Tracking",
+      icon: <Search size={28} strokeWidth={1.5} />,
+      title: "Drift Detection Engine",
       content:
-        "Trigger internal deployment logs and fetch live external commit statuses directly via Render API integration.",
+        "Automatically compares live Docker containers against the official GitHub repository to flag unauthorized configuration changes.",
     },
     {
-      icon: <Eye size={28} strokeWidth={1.5} />,
-      title: "Guest Sandbox",
+      icon: <Terminal size={28} strokeWidth={1.5} />,
+      title: "Integrated Web Shell",
       content:
-        "Safe, read-only exploration mode utilizing pre-loaded, platform-agnostic in-memory data for instant previewing.",
+        "Secure, in-browser terminal access (via xterm.js) allowing immediate remediation of server issues without external SSH clients.",
+    },
+    {
+      icon: <Zap size={28} strokeWidth={1.5} />,
+      title: "Redis Speed Layer",
+      content:
+        "High-performance caching and WebSocket pushes ensure real-time dashboard updates without hitting GitHub API rate limits.",
+    },
+    {
+      icon: <Bot size={28} strokeWidth={1.5} />,
+      title: "Automated Fixes",
+      content:
+        "Jenkins-powered stress testing validates manual hotfixes before committing them back to the source code repository.",
     },
     {
       icon: <ShieldCheck size={28} strokeWidth={1.5} />,
-      title: "Protected API",
+      title: "Auth & Security",
       content:
-        "Strictly secured REST endpoints requiring authenticated sessions, paired with a modern UI featuring session state indicators.",
+        "Enterprise-grade access control via NextAuth, securing the dashboard and API endpoints for authorized DevOps personnel only.",
     },
   ];
   
@@ -90,11 +69,38 @@ export default function Home() {
     <div className="w-screen min-h-screen bg-white flex pl-12 sm:pl-16 md:pl-24">
       
       <main className="w-full flex flex-col items-center overflow-x-hidden p-6 md:p-12 lg:p-20">
-        <h1
-          className="mt-10 md:mt-14 text-2xl sm:text-4xl md:text-6xl lg:text-7xl text-black font-orbitron font-semibold md:font-extrabold text-center leading-tight"
-          ref={heading}
-        >
-          Welcome to System_Seek
+        <style>{`
+          @keyframes reveal {
+            from {
+              opacity: 0;
+              transform: translateY(100%);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          .animate-reveal {
+            animation: reveal 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+          }
+        `}</style>
+        <h1 className="mt-10 md:mt-14 text-2xl sm:text-4xl md:text-6xl lg:text-7xl text-black font-orbitron font-semibold md:font-extrabold text-center leading-tight">
+          {text.split(" ").map((word, wordIndex) => (
+            <span key={wordIndex} className="inline-block whitespace-nowrap overflow-hidden align-bottom">
+              {word.split("").map((char, charIndex) => (
+                <span
+                  key={charIndex}
+                  className="inline-block opacity-0 animate-reveal"
+                  style={{
+                    animationDelay: `${getDelay(wordIndex * 10 + charIndex)}s`,
+                  }}
+                >
+                  {char}
+                </span>
+              ))}
+              <span className="inline-block">&nbsp;</span>
+            </span>
+          ))}
         </h1>
         
         <p className="mt-6 text-zinc-600 font-mono text-xs sm:text-sm md:text-base max-w-xl text-center">
@@ -160,7 +166,7 @@ export default function Home() {
 
         <footer className="w-full max-w-7xl mx-auto py-8 border-t border-zinc-200 flex flex-col md:flex-row justify-between items-center gap-6 mt-auto">
           <h3 className="font-orbitron font-bold text-xl text-black tracking-widest">
-            SYSTEM_SEEK
+            DriftSeeker
           </h3>
           <div className="flex gap-6 font-mono text-xs text-zinc-500 uppercase tracking-wider">
             <a href={session ? `https://github.com/${session.user.username}`  : "#"} className="hover:text-black transition-colors">GitHub</a>

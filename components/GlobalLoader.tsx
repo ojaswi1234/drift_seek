@@ -7,14 +7,10 @@ type GlobalLoaderProps = {
 };
 
 const GlobalLoader = ({ text = "AUTHENTICATING" }: GlobalLoaderProps) => {
-  const [mounted, setMounted] = useState(false);
-
-  // Ensure component only renders on client to prevent hydration errors
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) return null;
+  // Removed unnecessary client-side only rendering check to allow immediate display
+  // const [mounted, setMounted] = useState(false);
+  // useEffect(() => setMounted(true), []);
+  // if (!mounted) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-md overflow-hidden pointer-events-auto">

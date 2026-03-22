@@ -35,14 +35,14 @@ function Page() {
           <div className="flex items-center gap-2">
             <Terminal size={14} className="text-zinc-500" />
             <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">
-              {sysName}_CONSOLE // ACTIVE
+              DRIFTSEEKER_SHELL // {sysName}
             </span>
           </div>
           
           {/* Status Indicator */}
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-[9px] font-mono text-zinc-500 uppercase">SYS_ONLINE</span>
+            <span className="text-[9px] font-mono text-zinc-500 uppercase">SECURE_CONNECT</span>
           </div>
         </div>
 
@@ -50,15 +50,17 @@ function Page() {
         <div className="flex-1 p-6 overflow-y-auto font-mono text-sm">
           {/* Welcome Message */}
           <div className="text-zinc-500 mb-6 space-y-1">
-            <p>System_Seek OS v1.0.4 [Authenticated Session]</p>
-            <p>Welcome to the control plane, {session?.user?.name || "Admin"}.</p>
-            <p>Type &apos;help&apos; to see available modules.</p>
+            <p>DriftSeeker Secure Shell v2.1.0 [Encrypted]</p>
+            <p>Target: Standard_Node_Cluster_01</p>
+            <p>User: {session?.user?.name || "Admin"}</p>
+            <p className="pt-2">Type &apos;drift scan&apos; to check for configuration anomalies.</p>
+            <p>Type &apos;fix --auto&apos; to apply remediation patches via Jenkins.</p>
           </div>
           
           {/* Mock Command Prompt */}
           <div className="flex items-center gap-2 text-zinc-300">
             <span className="text-green-500">
-              sys@{sysName.toLowerCase()}
+              drift@{sysName.toLowerCase()}
             </span>
             <span className="text-blue-400">~</span>
             <span className="text-zinc-500">$</span>

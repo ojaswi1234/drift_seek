@@ -1,5 +1,5 @@
 "use client";
-import { Workflow, LogOut, User, Activity, Container, GitBranch, Terminal, ShieldAlert, Library, LayoutDashboard } from 'lucide-react';
+import { Workflow, LogOut, User, Activity, Container, GitBranch, Terminal, ShieldAlert, Library, LayoutDashboard, Search, Zap, Bot } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 import { useState } from 'react';
 import Image from 'next/image';
@@ -11,12 +11,12 @@ const Navbar = () => {
 
   // 2. STRIP THE (features) FOLDER FROM THE URLS
   const navItems = [
-    { id: 'dashboard', icon: <Activity size={24} strokeWidth={1.5} />, label: 'DASHBOARD', url: "/dashboard"},
-    { id: 'github_repos', icon: <Library size={24} strokeWidth={1.5} />, label: 'GITHUB_REPOS', url: "/gitRepo"},
-    { id: 'instances', icon: <Container size={24} strokeWidth={1.5} />, label: 'INSTANCES', url: "/container"},
-    { id: 'pipelines', icon: <GitBranch size={24} strokeWidth={1.5} />, label: 'PIPELINES', url: "/pipelines" },
-    { id: 'console', icon: <Terminal size={24} strokeWidth={1.5} />, label: 'CONSOLE', url: "/console" },
-    { id: 'security', icon: <ShieldAlert size={24} strokeWidth={1.5} />, label: 'SECURITY', url: "#" }, // Placeholder for now
+    { id: 'dashboard', icon: <LayoutDashboard size={24} strokeWidth={1.5} />, label: 'DASHBOARD', url: "/dashboard"},
+    { id: 'monitor', icon: <Activity size={24} strokeWidth={1.5} />, label: 'UPTIME_MONITOR', url: "/container"},
+    { id: 'drift', icon: <Search size={24} strokeWidth={1.5} />, label: 'DRIFT_ENGINE', url: "/gitRepo"},
+    { id: 'console', icon: <Terminal size={24} strokeWidth={1.5} />, label: 'WEB_SHELL', url: "/console" },
+    { id: 'jenkins', icon: <Bot size={24} strokeWidth={1.5} />, label: 'AUTO_FIXES', url: "/pipelines" },
+    { id: 'security', icon: <ShieldAlert size={24} strokeWidth={1.5} />, label: 'SECURITY', url: "#" }, 
   ];
 
   return (
