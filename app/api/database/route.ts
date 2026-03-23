@@ -5,7 +5,14 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET() {
   await dbConnect();
   const servers = await WebServer.find({});
-  return Response.json(servers);
+  // Add static status/reason/latency for now (removed from MongoDB schema)
+  const serversWithStaticData = servers.map((server: any) => ({
+    ...server.toObject(),
+    status: 'up',
+    reason: 'No Data (Redis Pending)', 
+    latency: 0
+  }));
+  return Response.json(serversWithStaticData);
 }
 
 interface WebServerBody {
@@ -23,8 +30,27 @@ export async function POST(req: NextRequest): Promise<Response> {
     await dbConnect();
     const body: WebServerBody = await req.json();
     const webserver: WebServerDocument = await WebServer.create(body);
-    return NextResponse.json(webserver);
-  } catch (error) {
+
+    // Trigger an initial ping without awaiting so it doesn't block the response
+    fetch(new URL('/api/monitor/ping', req.url).toString(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: webserver._id }),
+    }).catch(console.error);
+
+    return NextResponse.json({
+        ...webserver.toObject(),
+        status: 'up',
+        reason: 'Redis Pending',
+        latency: 0
+    });
+  } catch (error: any) {
+    if (error.code === 11000) {
+      return NextResponse.json(
+        { message: "A web server with this URL already exists." },
+        { status: 409 }
+      );
+    }
     if (error instanceof Error && error.name === "ValidationError") {
       return NextResponse.json(
         { message: error.message },
@@ -38,3 +64,29 @@ export async function POST(req: NextRequest): Promise<Response> {
     );
   }
 }
+
+export async function DELETE(req: NextRequest): Promise<Response> {
+  try {
+    await dbConnect();
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    
+    if (!id) {
+      return NextResponse.json(
+        { message: "ID is required" },
+        { status: 400 }
+      );
+    }
+
+    await WebServer.findByIdAndDelete(id);
+    return NextResponse.json({ message: "Deleted successfully" });
+  } catch (error) {
+    console.error("Delete error:", error);
+    return NextResponse.json(
+      { message: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+

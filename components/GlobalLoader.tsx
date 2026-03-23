@@ -1,91 +1,172 @@
-'use client'
-import React, { useEffect, useState } from 'react';
-import { Terminal, Box, GitMerge, Monitor, Database, Cloud, Activity, Cpu } from 'lucide-react';
+import React from 'react';
+import styled from 'styled-components';
 
-type GlobalLoaderProps = {
-  text?: string;
-};
-
-const GlobalLoader = ({ text = "AUTHENTICATING" }: GlobalLoaderProps) => {
-  // Removed unnecessary client-side only rendering check to allow immediate display
-  // const [mounted, setMounted] = useState(false);
-  // useEffect(() => setMounted(true), []);
-  // if (!mounted) return null;
-
+const GlobalLoader = () => {
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-md overflow-hidden pointer-events-auto">
-      <style>{`
-        @keyframes scale-hole {
-          0% { transform: scale(2); opacity: 0; box-shadow: 0px 0px 50px rgba(255, 255, 255, 0.5); }
-          50% { transform: scale(1) translate(0px, -5px); opacity: 1; box-shadow: 0px 8px 20px rgba(255, 255, 255, 0.5); }
-          100% { transform: scale(0.1) translate(0px, 5px); opacity: 0; box-shadow: 0px 10px 20px rgba(255, 255, 255, 0); }
-        }
-
-        @keyframes suck-in {
-          0% { transform: translate(var(--start-x), var(--start-y)) scale(1.2) rotate(0deg); opacity: 0; }
-          15% { opacity: 1; }
-          100% { transform: translate(0px, 0px) scale(0) rotate(360deg); opacity: 0; }
-        }
-
-        .hole-ring {
-          display: block;
-          position: absolute;
-          width: 50px;
-          height: 50px;
-          border-radius: 50%;
-          opacity: 0;
-          animation: scale-hole 3s linear infinite;
-        }
-
-        .vortex-icon {
-          position: absolute;
-          color: #a1a1aa;
-          animation: suck-in 3.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-        }
-      `}</style>
-
-      <div className="relative w-24 h-24 mb-8 flex items-center justify-center">
-        {/* Vortex Icons */}
-        {[
-          { icon: Terminal, x: '0px', y: '-140px', delay: '0s' },
-          { icon: Box, x: '100px', y: '-100px', delay: '0.4s' },
-          { icon: GitMerge, x: '140px', y: '0px', delay: '0.8s' },
-          { icon: Monitor, x: '100px', y: '100px', delay: '1.2s' },
-          { icon: Database, x: '0px', y: '140px', delay: '1.6s' },
-          { icon: Cloud, x: '-100px', y: '100px', delay: '2.0s' },
-          { icon: Activity, x: '-140px', y: '0px', delay: '2.4s' },
-          { icon: Cpu, x: '-100px', y: '-100px', delay: '2.8s' },
-        ].map((item, idx) => (
-          <div 
-            key={idx}
-            className="vortex-icon"
-            style={{ 
-              '--start-x': item.x, 
-              '--start-y': item.y, 
-              animationDelay: item.delay 
-            } as React.CSSProperties}
-          >
-            <item.icon size={20} strokeWidth={1.5} />
+    <StyledWrapper>
+      <div className="stage">
+        <div className="grid">
+          <div className="strip">
+            <div className="tip delay-18" />
+            <div className="tip reverse delay-17" />
+            <div className="tip delay-16" />
+            <div className="tip reverse delay-15" />
+            <div className="tip delay-14" />
           </div>
-        ))}
-
-        {/* Black Hole Core */}
-        <div className="relative flex items-center justify-center">
-          {[...Array(10)].map((_, i) => (
-            <i key={i} className="hole-ring" style={{ animationDelay: `${(i + 1) * 0.3}s` }} />
-          ))}
+          <div className="strip">
+            <div className="tip delay-01" />
+            <div className="tip reverse delay-02" />
+            <div className="tip delay-f" />
+            <div className="tip reverse delay-e" />
+            <div className="tip delay-d" />
+            <div className="tip reverse delay-13" />
+            <div className="tip delay-12" />
+          </div>
+          <div className="strip">
+            <div className="tip reverse delay-03" />
+            <div className="tip delay-04" />
+            <div className="tip reverse delay-a" />
+            <div className="tip delay-b" />
+            <div className="tip reverse delay-c" />
+            <div className="tip delay-11" />
+            <div className="tip reverse delay-10" />
+          </div>
+          <div className="strip">
+            <div className="tip reverse delay-05" />
+            <div className="tip delay-06" />
+            <div className="tip reverse delay-07" />
+            <div className="tip delay-08" />
+            <div className="tip reverse delay-09" />
+          </div>
         </div>
       </div>
-
-      {/* Loading Text */}
-      <div className="flex gap-1 text-[10px] font-mono tracking-[0.3em] text-zinc-400 uppercase">
-        <span>{text}</span>
-        <span className="animate-pulse" style={{ animationDelay: '0s' }}>.</span>
-        <span className="animate-pulse" style={{ animationDelay: '0.2s' }}>.</span>
-        <span className="animate-pulse" style={{ animationDelay: '0.4s' }}>.</span>
-      </div>
-    </div>
+    </StyledWrapper>
   );
-};
+}
+
+const StyledWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+
+  .stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .grid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .strip {
+    display: flex;
+  }
+  .tip {
+    width: 0;
+    height: 0;
+    margin: 0 -6px;
+    border-left: 12px solid transparent;
+    border-right: 12px solid transparent;
+    border-bottom: 22px solid white;
+    filter: drop-shadow(0 0 18px white);
+    animation: pulse 1s infinite;
+  }
+  .tip.reverse {
+    transform: rotate(180deg);
+  }
+  .delay-01 {
+    animation-delay: -0.05s;
+  }
+  .delay-02 {
+    animation-delay: -0.1s;
+  }
+  .delay-03 {
+    animation-delay: -0.15s;
+  }
+  .delay-04 {
+    animation-delay: -0.2s;
+  }
+  .delay-05 {
+    animation-delay: -0.25s;
+  }
+  .delay-06 {
+    animation-delay: -0.3s;
+  }
+  .delay-07 {
+    animation-delay: -0.35s;
+  }
+  .delay-08 {
+    animation-delay: -0.4s;
+  }
+  .delay-09 {
+    animation-delay: -0.45s;
+  }
+  .delay-10 {
+    animation-delay: -0.5s;
+  }
+  .delay-11 {
+    animation-delay: -0.55s;
+  }
+  .delay-12 {
+    animation-delay: -0.6s;
+  }
+  .delay-13 {
+    animation-delay: -0.65s;
+  }
+  .delay-14 {
+    animation-delay: -0.7s;
+  }
+  .delay-15 {
+    animation-delay: -0.75s;
+  }
+  .delay-16 {
+    animation-delay: -0.8s;
+  }
+  .delay-17 {
+    animation-delay: -0.85s;
+  }
+  .delay-18 {
+    animation-delay: -0.9s;
+  }
+  .delay-19 {
+    animation-delay: -0.95s;
+  }
+  .delay-20 {
+    animation-delay: -1s;
+  }
+
+  .delay-a {
+    animation-delay: -0.17s;
+  }
+  .delay-b {
+    animation-delay: -0.33s;
+  }
+  .delay-c {
+    animation-delay: -0.5s;
+  }
+  .delay-d {
+    animation-delay: -0.67s;
+  }
+  .delay-e {
+    animation-delay: -0.83s;
+  }
+  .delay-f {
+    animation-delay: -1s;
+  }
+
+  @keyframes pulse {
+    0% {
+      opacity: 0.1;
+    }
+    30% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0.1;
+    }
+  }`;
 
 export default GlobalLoader;

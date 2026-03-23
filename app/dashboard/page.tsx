@@ -83,7 +83,7 @@ function Page() {
   }, [status]);
 
   if (status === "loading") {
-    return <GlobalLoader text="VERIFYING_SESSION..." />;
+    return <GlobalLoader />;
   }
 
   return (

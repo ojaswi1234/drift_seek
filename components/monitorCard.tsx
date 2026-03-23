@@ -5,7 +5,8 @@ interface MonitorCardProps {
   id: string;
   name?: string; // e.g. "Primary API"
   url: string;  // e.g. "https://google.com"
-  status: 'online' | 'offline' | 'pending' | 'error';
+  status: 'online' | 'offline' | 'pending' | 'error' | 'up' | 'down';
+  reason?: string;
   latency?: number; // in ms
   lastChecked?: string;
   onDelete?: (id: string) => void;
@@ -16,14 +17,15 @@ const MonitorCard: React.FC<MonitorCardProps> = ({
   id, 
   name, 
   url, 
-  status, 
+  status,
+  reason,
   latency, 
   lastChecked,
   onDelete,
   onCheck
 }) => {
-  const isOnline = status === 'online';
-  const isError = status === 'offline' || status === 'error';
+  const isOnline = status === 'online' || status === 'up';
+  const isError = status === 'offline' || status === 'error' || status === 'down';
   
   // Updated colors for light mode
   const statusColor = isOnline ? 'text-green-600' : isError ? 'text-red-600' : 'text-gray-500';
@@ -33,12 +35,23 @@ const MonitorCard: React.FC<MonitorCardProps> = ({
 
   async function deleteTarget(id: string){
     try{
-
+      const response = await fetch(`/api/database?id=${id}`, {
+        method: "DELETE",
+      });
+      
+      if (response.ok) {
+        onDelete?.(id);
+      } else {
+        console.error("Failed to delete target: ", await response.text());
+      }
     }
     catch(error){
       console.error("Failed to delete target:", error);
     }
   };
+
+
+
 
   return (
     <div className={`group relative w-full p-5 bg-white border ${borderColor} shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-300 rounded-lg`}>
@@ -73,6 +86,12 @@ const MonitorCard: React.FC<MonitorCardProps> = ({
         </div>
       </div>
 
+      {isError && reason && (
+        <div className="mb-4 text-[10px] font-mono text-red-600 bg-red-50 p-2 rounded border border-red-100 uppercase tracking-widest">
+          {reason}
+        </div>
+      )}
+
       {/* Metrics Grid */}
       <div className="grid grid-cols-2 gap-px bg-gray-100 border border-gray-100 overflow-hidden rounded-md my-4">
         <div className="bg-white p-3 flex flex-col justify-center">
@@ -100,7 +119,7 @@ const MonitorCard: React.FC<MonitorCardProps> = ({
           <PlayCircle size={14} /> Test
         </button>
         <button 
-          onClick={() => onDelete?.(id)}
+          onClick={() => deleteTarget(id)}
           className="flex items-center justify-center w-8 h-8 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"
           title="Remove Target"
         >

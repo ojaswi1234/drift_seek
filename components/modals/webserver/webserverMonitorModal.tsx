@@ -4,11 +4,13 @@ import "./webserver.css";
 interface WebserverMonitorModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 const WebserverMonitorModal = ({
   isOpen,
   onClose,
+  onSuccess,
 }: WebserverMonitorModalProps) => {
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -36,11 +38,15 @@ const WebserverMonitorModal = ({
         body: JSON.stringify(userData),
       });
 
+      if (res.status === 409) {
+        alert("This URL is already being monitored!");
+        return;
+      }
+
       const rawBody = await res.text();
       const contentType = res.headers.get("content-type") || "";
 
-      const data =
-        rawBody && contentType.includes("application/json")
+      const data = rawBody && contentType.includes("application/json")
           ? JSON.parse(rawBody)
           : rawBody || null;
 
@@ -51,8 +57,13 @@ const WebserverMonitorModal = ({
       }
 
       console.log("Response from server:", data);
+      
+      // Call onSuccess to referesh the list and close the modal
+      if (onSuccess) onSuccess();
+      
     } catch (err) {
       console.error("Error sending data:", err);
+      alert("An error occurred while saving the monitor.");
     }
   };
 

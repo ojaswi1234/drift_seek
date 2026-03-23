@@ -5,27 +5,38 @@ import React, { useEffect, useState } from "react";
 import WebserverMonitorModal from "@/components/modals/webserver/webserverMonitorModal";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
+import GlobalLoader from "@/components/GlobalLoader";
 
 function Page() {
   const [website, setWebsite] = useState([] as any[]);
   const [container, setContainer] = useState([] as any[]);
-const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-const { status } = useSession({
+  const { status } = useSession({
     required: true,
     onUnauthenticated() {
       redirect("/");
     },
   });
 
-React.useEffect(()=>{
-  if(status === "authenticated"){
-
+  const fetchMonitors = () => {
+    setIsLoading(true);
     fetch("/api/database")
-    .then(res => res.json())
-    .then(data => setWebsite(data.webservers || []))
-  }
-}, [status]);
+      .then((res) => res.json())
+      .then((data) => {
+        const webServersData = Array.isArray(data) ? data : data.webservers || [];
+        setWebsite(webServersData);
+      })
+      .catch((err) => console.error("Error fetching webservers:", err))
+      .finally(() => setIsLoading(false));
+  };
+
+  React.useEffect(() => {
+    if (status === "authenticated") {
+      fetchMonitors();
+    }
+  }, [status]);
   return (
     <div className="flex flex-col min-h-screen bg-white py-10 px-6 md:px-12 lg:px-44 font-orbitron text-black">
       {/* Header Section */}
@@ -52,9 +63,13 @@ React.useEffect(()=>{
             + Add Monitor
           </button>
 
-          {website.length === 0 ? (
+          {isLoading ? (
+            <div className="flex-1 flex flex-col items-center justify-center min-h-[250px] border-2 border-dashed border-gray-200 rounded-lg p-6">
+              <GlobalLoader />
+            </div>
+          ) : website.length === 0 ? (
             /* FIXED: Wrapper div to take remaining space and center content perfectly */
-            <div className="flex-1 flex flex-col items-center justify-center min-h-62.5 border-2 border-dashed border-gray-200 rounded-lg p-6">
+            <div className="flex-1 flex flex-col items-center justify-center min-h-[250px] border-2 border-dashed border-gray-200 rounded-lg p-6">
               <p className="text-gray-400 text-center">
                 Add your website to monitor
               </p>
@@ -64,12 +79,20 @@ React.useEffect(()=>{
               {website.map((item, index) => (
                 <MonitorCard 
                   key={index}
-                  id={item.id}
+                  id={item.id || item._id}
                   name={item.name}
                   url={item.url}
                   status={item.status}
+                  reason={item.reason}
                   latency={item.latency}
-                  lastChecked={item.lastChecked}
+                  lastChecked={item.lastChecked || item.updatedAt}
+                  onDelete={(idToRemove) => setWebsite(prev => prev.filter((w: any) => (w.id || w._id) !== idToRemove))}
+                  onCheck={(id) => {
+                    fetch('/api/monitor/ping', {
+                      method: 'POST',
+                      body: JSON.stringify({ id }),
+                    }).finally(() => fetchMonitors());
+                  }}
                 />
               ))}
             </div>
@@ -109,6 +132,10 @@ React.useEffect(()=>{
       <WebserverMonitorModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)}
+        onSuccess={() => {
+          setIsModalOpen(false);
+          fetchMonitors();
+        }}
       />
     </div>
   );
