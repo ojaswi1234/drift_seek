@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '../../../../lib/db_connect';
 import WebServer from '../../../../lib/models/WebServer';
+import redis from "../../../../lib/redis/index";
 
 async function calculateLatency(url: string): Promise<{ latency: number; status: 'up' | 'down'; reason: string }> {
   const start = performance.now();
@@ -43,14 +44,26 @@ export async function POST(req: Request) {
     }
 
     const targetUrl = webServer.url;
-    // const { latency, status, reason } = await calculateLatency(targetUrl);
+     const { latency, status, reason } = await calculateLatency(targetUrl);
 
-    // webServer.status = status;
-    // webServer.latency = latency;
-    // webServer.reason = reason;
+   const redisKey = `monitor:stats:${webServer._id}`;
+    await redis.hset(redisKey, {
+        status,
+        latency,
+        reason,
+        lastChecked: new Date().toISOString()
+    });
+    // Set expiry if you want, e.g., 24 hours
+    // await redis.expire(redisKey, 86400);
+
+    // 2. Prepare response
+    const responseData = webServer.toObject();
+    responseData.status = status;
+    responseData.latency = latency;
+    responseData.reason = reason;
     // await webServer.save();
 
-    return NextResponse.json({ message: 'Ping successful', data: webServer }, { status: 200 });
+    return NextResponse.json({ message: 'Ping successful', data: responseData }, { status: 200 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }

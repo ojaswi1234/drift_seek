@@ -1,36 +1,106 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# System Seek (DriftSeeker)
 
-## Getting Started
+## Overview
 
-First, run the development server:
+System Seek is a Next.js 16 application focused on DevOps drift visibility and uptime checks.
+It provides:
+
+- GitHub OAuth authentication via NextAuth
+- Protected dashboard and feature pages
+- URL status checks with diagnostic timing traces
+- Web server monitor CRUD (MongoDB) with ping state in Redis
+- GitHub repository listing for authenticated users
+
+## Tech Stack
+
+- Next.js 16 (App Router), React 19, TypeScript
+- NextAuth v4 with GitHub provider
+- MongoDB + Mongoose
+- Redis (ioredis)
+- Tailwind CSS v4
+- Playwright (test scaffold)
+
+## Key Features
+
+- Authenticated UX with session-aware UI states
+- Protected API endpoint at /api/restricted
+- Dashboard status checker using /api/check_status
+- Per-target diagnostic trace for failures (DNS, TCP, TLS, TTFB via curl)
+- Monitor management using /api/database and /api/monitor/ping
+- Sidebar navigation to dashboard, monitor, console, and pipeline areas
+
+## 24/7 Monitoring Workflow
+
+The monitoring workflow image is included below from the public folder.
+
+![24/7 Monitoring Workflow](/realtime_monitoring_workflow.png)
+
+## Project Structure (Important Areas)
+
+- app/(features)/monitors/page.tsx: Monitor management UI
+- app/(features)/console/page.tsx: Protected console view
+- app/dashboard/page.tsx: Authenticated status and drift overview UI
+- app/api/check_status/route.ts: URL health + diagnostic timing trace
+- app/api/database/route.ts: Monitor create/read/delete
+- app/api/monitor/ping/route.ts: Ping monitor target and store status in Redis
+- app/api/github/repos/route.ts: Authenticated GitHub repos fetch
+- app/api/auth/[...nextauth]/route.ts: NextAuth GitHub setup
+
+## Environment Variables
+
+Create a .env.local file with:
+
+```env
+GITHUB_ID=your_github_oauth_app_client_id
+GITHUB_SECRET=your_github_oauth_app_client_secret
+NEXTAUTH_SECRET=your_random_nextauth_secret
+NEXTAUTH_URL=http://localhost:3000
+
+MONGODB_URI=mongodb://127.0.0.1:27017/system_seek
+REDIS_URL=redis://default:password@127.0.0.1:6379
+```
+
+Notes:
+
+- GITHUB_ID and GITHUB_SECRET are required at startup.
+- MONGODB_URI is required by the database connector.
+- REDIS_URL is optional in code (a default is used if omitted), but setting it explicitly is recommended.
+
+## Installation
+
+```bash
+npm install
+```
+
+## Run In Development
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+App URL: http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Available Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run dev
+npm run build
+npm run start
+npm run lint
+```
 
-## Learn More
+## API Endpoints
 
-To learn more about Next.js, take a look at the following resources:
+- GET /api/restricted: Session-protected sample endpoint
+- GET /api/check_status?url=<target>: Check URL and return status/diagnostics
+- GET /api/database: List monitored targets
+- POST /api/database: Add monitor target (name, url)
+- DELETE /api/database?id=<id>: Remove monitor target
+- POST /api/monitor/ping: Trigger single ping by id or url
+- GET /api/github/repos: Fetch authenticated user's repositories
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Current Project Notes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Dockerfile, docker-compose.yaml, and Jenkinsfile are present but currently empty.
+- The pipelines page is currently a placeholder UI.
+- Playwright test file is scaffold/example and not yet project-specific.
