@@ -33,7 +33,7 @@ It provides:
 
 The monitoring workflow image is included below from the public folder.
 
-![24/7 Monitoring Workflow](/realtime_monitoring_workflow.png)
+![24/7 Monitoring Workflow](/public/realtime_monitoring_workflow.png)
 
 ## Project Structure (Important Areas)
 
