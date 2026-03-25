@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Orbitron } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
 import Navbar from "@/components/Navbar";
+import StyledComponentsRegistry from "@/lib/registry";
 import nextFontLocal from 'next/font/local';
 
 const consolas = nextFontLocal({
@@ -41,9 +42,11 @@ export default function RootLayout({children}: Readonly<{children: React.ReactNo
       >
         
         <Providers>
-        <Navbar />
-          {children}
-          </Providers>
+          <StyledComponentsRegistry>
+            <Navbar />
+            {children}
+          </StyledComponentsRegistry>
+        </Providers>
       </body>
     </html>
   );

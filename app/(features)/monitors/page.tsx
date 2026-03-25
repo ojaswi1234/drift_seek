@@ -41,7 +41,7 @@ function Page() {
     <div className="flex flex-col min-h-screen bg-white py-10 px-6 md:px-12 lg:px-44 font-orbitron text-black overflow-y-hidden">
       {/* Header Section */}
       <h1 className="text-3xl md:text-4xl font-bold mb-4 tracking-wide">
-        <span className="font-sans text-transparent bg-clip-text outlined-text ">
+        <span className="font-sans text-transparent bg-clip-text outlined-text">
           24/7
         </span>{" "}
         Web server Monitoring
@@ -57,7 +57,7 @@ function Page() {
       <div className="flex flex-col lg:flex-row w-full flex-1 gap-10 lg:gap-16 h-full">
         
         {/* Left Column: Input & Monitors */}
-        <aside className="w-full lg:w-1/2 flex flex-col h-full ">
+        <aside className="w-full lg:w-1/2 flex flex-col h-full">
           <button className="self-end mb-6 px-6 py-3 bg-black text-white uppercase text-sm tracking-widest hover:bg-zinc-800 transition-all cursor-pointer"
           onClick={() => setIsModalOpen(true)}>
             + Add Monitor
