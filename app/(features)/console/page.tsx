@@ -16,7 +16,7 @@ function Page() {
   });
 
   if (status === "loading") {
-    return <GlobalLoader text="LOADING_CONSOLE..." />;
+    return <GlobalLoader  />;
   }
 
   // Format the user's name for a more technical look (e.g., "John Doe" -> "JOHN_DOE")
