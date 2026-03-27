@@ -54,8 +54,8 @@ Create a .env.local file with:
 GITHUB_ID=your_github_oauth_app_client_id
 GITHUB_SECRET=your_github_oauth_app_client_secret
 NEXTAUTH_SECRET=your_random_nextauth_secret
-NEXTAUTH_URL=your_local_url
-
+NEXTAUTH_URL=your_oauth_app_redirect_url
+NEXT_PUBLIC_API_BASE_URL=your_local_url
 MONGODB_URI=your_mongodb_connection_connection_string
 REDIS_URL=your_local_redis_server_url
 ```
@@ -69,24 +69,43 @@ Notes:
 ## Installation
 
 ```bash
-npm install
+npm run setup
 ```
+This will install dependencies for both the main Next.js app and the terminal-server subproject.
 
 ## Run In Development
 
 ```bash
 npm run dev
 ```
+This will start:
+- The Next.js app
+- Redis server (in-memory, with appendonly persistence)
+- The terminal-server (Node.js backend)
+
+App URL: http://localhost:3000
 
 App URL: http://localhost:3000
 
 ## Available Scripts
 
 ```bash
-npm run dev
+```bash
+# Install all dependencies (main app + terminal-server)
+npm run setup
+
+# Start Next.js, Redis, and terminal-server together
+yarn dev  # or npm run dev
+
+# Build Next.js app
 npm run build
+
+# Start production server (after build)
 npm run start
+
+# Lint code
 npm run lint
+```
 ```
 
 ## API Endpoints
