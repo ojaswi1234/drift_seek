@@ -18,8 +18,10 @@ function Page() {
   const [input, setInput] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [isShellConnected, setIsShellConnected] = useState(false);
+  const [currentDir, setCurrentDir] = useState<string>("/projects");
   const scrollRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
+  const pendingCommandRef = useRef<string | null>(null);
 
   // 1. Setup WebSocket connection to the Handyman Server
   useEffect(() => {
@@ -70,11 +72,50 @@ function Page() {
 
     socketRef.current.on("output", (data: string) => {
       // Append raw terminal output to history
-      const cleanData = data.replace(
-        /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g,
-        ''
-      );
-      setHistory((prev) => [...prev, cleanData]);
+      let cleanData = data
+        // 1. Filter out Window Title / OSC sequences (e.g. \x1b]0;...\x07)
+        .replace(/[\u001b\u009b]]\d+;[^\x07]+\x07/g, "")
+        // 2. Filter out CSI / SGR ANSI color codes
+        .replace(
+          /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g,
+          ''
+        );
+
+      // Extract the current directory from our specific PTY prompt format
+      const promptRegex = /DRIFT_SERVER_PROMPT\|(.*?)\>\s/g;
+      let extractedDir: string | null = null;
+      let match;
+      while ((match = promptRegex.exec(cleanData)) !== null) {
+        extractedDir = match[1];
+      }
+      if (extractedDir) {
+        setCurrentDir(extractedDir);
+      }
+
+      // Filter out the prompt entirely
+      cleanData = cleanData.replace(promptRegex, "");
+
+      // Filter out typical fallback bash prompts in case they slip through
+      cleanData = cleanData.replace(/[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+:[^\n]+?[#$]\s*/g, "");
+
+      // Filter out the PTY echoed command
+      if (pendingCommandRef.current) {
+        const cmd = pendingCommandRef.current;
+        if (cleanData.trim() === cmd) {
+          // Chunk is purely the echoed command
+          cleanData = "";
+          pendingCommandRef.current = null;
+        } else if (cleanData.trim().startsWith(cmd)) {
+          // Chunk contains the echo at the beginning, strip it along with trailing newlines
+          const escapedCmd = cmd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          cleanData = cleanData.replace(new RegExp(`^\\s*${escapedCmd}\\s*\\r?\\n?`), "");
+          pendingCommandRef.current = null;
+        }
+      }
+
+      if (cleanData) {
+        setHistory((prev) => [...prev, cleanData]);
+      }
     });
 
     return () => {
@@ -95,9 +136,9 @@ function Page() {
 
   if (status === "loading") return <GlobalLoader />;
 
-  const sysName = session?.user?.name
-    ? session.user.name.toUpperCase().replace(/\s+/g, "_")
-    : "ROOT_USER";
+  const sysName = session?.user?.username
+    ? session.user.username.toLowerCase().replace(/\s+/g, "_")
+    : "root_user";
 
   const handleCommand = (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,6 +161,7 @@ function Page() {
 
     // Emit the command + Enter key (\r) to the Node-pty backend [cite: 56, 76]
     try {
+      pendingCommandRef.current = input.trim();
       socketRef.current.emit("input", input + "\r");
     } catch (err) {
       console.error("Failed to send command:", err);
@@ -131,7 +173,7 @@ function Page() {
     }
 
     // Add the user command to history for visual feedback
-    const prompt = `drift@${sysName.toLowerCase()}:~$ ${input}`;
+    const prompt = `${sysName}:${currentDir}$ ${input}`;
     setHistory((prev) => [...prev, prompt]);
 
     setInput("");
@@ -186,7 +228,7 @@ function Page() {
               <p
                 key={i}
                 className={
-                  line.includes("drift@")
+                  line.startsWith(`${sysName}:`) || line.includes("[client]") || line.includes("[server]")
                     ? "text-zinc-400"
                     : "text-green-400/90 whitespace-pre-wrap"
                 }
@@ -199,13 +241,9 @@ function Page() {
           {/* Active Input Line */}
           <form
             onSubmit={handleCommand}
-            className="flex items-center gap-2 text-zinc-300"
+            className="flex items-center gap-2 text-zinc-300 mt-1"
           >
-            <span className="text-green-500 whitespace-nowrap">
-              drift@{sysName.toLowerCase()}
-            </span>
-            <span className="text-blue-400">~</span>
-            <span className="text-zinc-500">$</span>
+            <span className="text-zinc-400 shrink-0">{sysName}:{currentDir}$</span>
             <input
               autoFocus
               className="bg-transparent border-none outline-none flex-1 text-zinc-300 caret-green-500"

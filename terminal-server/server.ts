@@ -23,22 +23,34 @@ function startServer() {
     try {
       const shell = os.platform() === "win32" ? "powershell.exe" : "bash";
       const customUser = socket.handshake.auth.username || "drift_user";
-  
+  const targetContainer = "ubuntu:latest"; 
+
+// The executable is now Docker, not bash
+const command = "docker";
+
+// Arguments array for the Docker CLI
+const args = [
+  "run",        // Use 'exec' if connecting to an already running container
+  "--rm",       // Crucial: Deletes the container when the user closes the shell
+  "-it",        // Keeps STDIN open and allocates a pseudo-TTY
+  "-w", "/projects", // Set initial working directory to /projects
+  "-e", "TERM=dumb",
+  "-e", `PS1=DRIFT_SERVER_PROMPT|\\w> `,
+  "-e", "PROMPT_COMMAND=", // Disable window title sequences
+  // "--network", "none", // Optional: Completely disable internet inside the shell
+  targetContainer,
+  "bash",       // The shell to run INSIDE the container
+  "--noprofile",
+  "--norc"
+];
   console.log(`Secure Shell Session Started for: ${customUser}`);
-      ptyProcess = pty.spawn(shell, ["--noprofile", "--norc"], {
+      ptyProcess = pty.spawn(command, args, {
         name: "xterm-color",
         cols: 80,
         rows: 30,
         cwd: process.cwd(),
         env: {
           ...process.env,
-         TERM: "dumb", // Keeps output clean from ANSI codes
-    // This line overrides the prompt to match your desired format
-    // \u is username, \w is working directory (we'll simplify to ~)
-    PS1: "", // Set to empty string so only the frontend UI prompt shows
-    // Tell bash not to read system profiles that might overwrite PS1
-    BASH_ENV: "",
-    ENV: "",
           DRIFT_ENGINE_ACTIVE: "true",
         },
       });
