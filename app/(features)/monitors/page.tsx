@@ -6,12 +6,15 @@ import WebserverMonitorModal from "@/components/modals/webserver/webserverMonito
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import GlobalLoader from "@/components/GlobalLoader";
+import Github from "next-auth/providers/github";
+import GithubRepoModal from "@/components/modals/githubRepos/githubrepoModal";
 
 function Page() {
   const [website, setWebsite] = useState([] as any[]);
   const [container, setContainer] = useState([] as any[]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const[isGithubModalOpen, setIsGithubModalOpen] = useState(false);
 
   const { status } = useSession({
     required: true,
@@ -61,7 +64,7 @@ function Page() {
 
       {/* Main Content Area - Stacks on mobile, side-by-side on large screens */}
       <div className="flex flex-col lg:flex-row w-full flex-1 gap-10 lg:gap-16 min-h-0">
-        
+        <GithubRepoModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
         {/* Left Column: Input & Monitors */}
         <aside className="w-full lg:w-1/2 flex flex-col h-full min-h-0">
           <button className="shrink-0 self-end mb-6 px-6 py-3 bg-black text-white uppercase text-sm tracking-widest hover:bg-zinc-800 transition-all cursor-pointer"
@@ -113,7 +116,8 @@ function Page() {
 
         {/* Right Column: Containers */}
         <aside className="w-full lg:w-1/2 flex flex-col h-full min-h-0">
-          <button className="shrink-0 self-end mb-6 px-6 py-3 bg-black text-white uppercase text-sm tracking-widest hover:bg-zinc-800 transition-all">
+          <button className="shrink-0 self-end mb-6 px-6 py-3 bg-black text-white uppercase text-sm tracking-widest hover:bg-zinc-800 transition-all"
+          onClick={() => setIsGithubModalOpen(true)}>
             + Add Container
           </button>
           
@@ -135,6 +139,7 @@ function Page() {
           )}
         </aside>
       </div>
+      <GithubRepoModal isOpen={isGithubModalOpen} onClose={() => setIsGithubModalOpen(false)} />
       <WebserverMonitorModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)}
