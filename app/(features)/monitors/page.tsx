@@ -84,7 +84,7 @@ function Page() {
               </p>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-10">
+            <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-10 scrollbtn">
               {website.map((item, index) => (
                 <MonitorCard 
                   key={index}

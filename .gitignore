@@ -51,4 +51,5 @@ node_modules/
 
 #redis
 /appendonlydir
+/appendonlydir/*
 dump.rdb
