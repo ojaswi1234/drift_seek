@@ -3,11 +3,21 @@ import dbConnect from "@/lib/db_connect";
 import WebServer from "@/lib/models/WebServer";
 import { NextRequest, NextResponse } from "next/server";
 import redis from "@/lib/redis";
+import { getServerSession } from "next-auth/next";
+// UPDATE THIS PATH TO MATCH YOUR NEXTAUTH CONFIG LOCATION:
+import { authOptions } from "@/app/api/auth/[...nextauth]/route"; 
 
 export async function GET() {
   try {
+    // 1. Authenticate the GET request
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user || !session.user.email) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
     await dbConnect();
-    const servers = await WebServer.find({});
+    // 2. Fetch ONLY the servers owned by the logged-in user
+    const servers = await WebServer.find({ ownerEmail: session.user.email });
     
     const serversWithData = await Promise.all(servers.map(async (server: any) => {
       let stats: any = {};
@@ -35,7 +45,7 @@ export async function GET() {
 }
 
 interface WebServerBody {
-  [key: string]: unknown;
+  [key: string]: any; // Changed to any to allow dynamic injection of ownerEmail
 }
 
 interface WebServerDocument extends WebServerBody {
@@ -47,13 +57,32 @@ interface WebServerDocument extends WebServerBody {
 
 export async function POST(req: NextRequest): Promise<Response> {
   try {
+    // 1. Authenticate the POST request
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user || !session.user.email) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
     await dbConnect();
     const body: WebServerBody = await req.json();
+    let cleanUrl = body.url as string;
+    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+      cleanUrl = `https://${cleanUrl}`; // Auto-append https if missing
+    }
+
+    // Optional: Strictly validate it's a real URL format before saving
+    try {
+      new URL(cleanUrl);
+    } catch (e) {
+      return NextResponse.json({ message: "Invalid URL format" }, { status: 400 });
+    }
+
+    body.url = cleanUrl; // Replace the bad input with the clean one
+    // 2. Inject the verified email from the session into the payload
+    body.ownerEmail = session.user.email;
+
     const webserver: WebServerDocument = await WebServer.create(body);
 
-    // Trigger an initial ping without awaiting so it doesn't block the response
-    // Use http://localhost for internal calls to avoid SSL issues with req.url behind proxies
-    //const port = process.env.PORT || 3000;
     const localUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
     fetch(`${localUrl}/api/monitor/ping`, {
       method: 'POST',
@@ -90,6 +119,12 @@ export async function POST(req: NextRequest): Promise<Response> {
 
 export async function DELETE(req: NextRequest): Promise<Response> {
   try {
+    // 1. Authenticate the DELETE request
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user || !session.user.email) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
     await dbConnect();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
@@ -99,6 +134,16 @@ export async function DELETE(req: NextRequest): Promise<Response> {
         { message: "ID is required" },
         { status: 400 }
       );
+    }
+
+    // 2. Optional but highly recommended: Ensure the user actually owns the server they are deleting
+    const serverToDelete = await WebServer.findById(id);
+    if (!serverToDelete) {
+      return NextResponse.json({ message: "Server not found" }, { status: 404 });
+    }
+    
+    if (serverToDelete.ownerEmail !== session.user.email) {
+      return NextResponse.json({ message: "Forbidden: You do not own this monitor" }, { status: 403 });
     }
 
     await WebServer.findByIdAndDelete(id);
@@ -111,5 +156,3 @@ export async function DELETE(req: NextRequest): Promise<Response> {
     );
   }
 }
-
-

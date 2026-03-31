@@ -1,0 +1,23 @@
+name: DriftSeeker Watchtower
+
+on:
+  schedule:
+    # This cron syntax means: "Run every 2 minutes, every hour, every day"
+    - cron: '*/2 * * * *'
+  
+  # This line is a lifesaver. It adds a "Run Workflow" button in your GitHub UI
+  # so you can trigger the script manually without waiting 2 minutes to test it!
+  workflow_dispatch: 
+
+jobs:
+  run-pings:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake up the Watchtower API
+        # We use 'curl' to make a simple GET request to your API
+        # Replace the URL below with your actual deployed Vercel/production URL
+        run: |
+          curl -X GET "https://your-production-url.com/api/cron/watchtower" \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          -H "Content-Type: application/json" \
+          --fail

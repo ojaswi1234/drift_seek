@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const WebServerSchema = new mongoose.Schema({
   name: { type: String, required: true },
   url: { type: String, required: true , unique: true},
+  ownerEmail: { type: String, required: true }
   // status, reason, latency will be moved to Redis later
 }, { 
   timestamps: true,
