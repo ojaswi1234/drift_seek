@@ -16,6 +16,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+   turbopack: {},
   webpack: (config) => {
     config.externals.push({
       express: "commonjs express",
