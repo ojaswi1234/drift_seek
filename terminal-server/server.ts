@@ -2,6 +2,7 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import * as pty from "node-pty";
+import dotenv from "dotenv";
 import os from "os";
 dotenv.config();
 

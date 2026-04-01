@@ -33,7 +33,7 @@ function Page() {
   : "root_user";
 
       socketRef.current = io(
-        "https://expert-train-6p67vjvvjrpcr6gw-3001.app.github.dev",
+        process.env.NEXT_PUBLIC_SERVER_BASE_URL || "http://localhost:3001",
         {
           transports: ["polling", "websocket"],
           auth: { username: sysName },
