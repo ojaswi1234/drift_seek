@@ -17,7 +17,7 @@ jobs:
         # We use 'curl' to make a simple GET request to your API
         # Replace the URL below with your actual deployed Vercel/production URL
         run: |
-          curl -X GET "https://your-production-url.com/api/cron/watchtower" \
+          curl -X GET "https://drift-seek.vercel.app/api/cron/watchtower" \
           -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
           -H "Content-Type: application/json" \
           --fail
