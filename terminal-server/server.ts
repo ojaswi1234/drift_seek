@@ -3,12 +3,13 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import * as pty from "node-pty";
 import os from "os";
+dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: ["https://expert-train-6p67vjvvjrpcr6gw-3000.app.github.dev"],
+    origin: [process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000"],
     methods: ["GET", "POST"],
     credentials: true,
   },
