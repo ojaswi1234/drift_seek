@@ -96,8 +96,9 @@ const args = [
     });
   });
 
-  httpServer.listen(3001, () => {
-    console.log("Handyman Terminal running on port 3001");
+  const port = process.env.PORT || 3001;
+  httpServer.listen(port, () => {
+    console.log(`Handyman Terminal running on port ${port}`);
   });
 }
 
@@ -115,6 +116,9 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason) => {
   console.error("Unhandled rejection:", reason);
 });
+
+
+
 
 app.get("/", (req, res) => {
   res.send("Handyman Terminal Server is running.");
