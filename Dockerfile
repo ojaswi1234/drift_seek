@@ -4,7 +4,7 @@ FROM node:20-alpine AS builder
 # Set the working directory inside the container
 WORKDIR /app
 
-# Copy package files and install dependencies
+RUN apk add --no-cache python3 make g++ linux-headers
 COPY package*.json ./
 RUN npm install
 
@@ -19,15 +19,18 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
+# FIX: Install Python and build tools so node-pty can compile in the runner stage
+RUN apk add --no-cache python3 make g++ linux-headers
+
 # Copy only the necessary files from the builder stage
 COPY --from=builder /app/next.config.ts ./
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/package*.json  package*.json ./
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/package-lock.json ./
 
-
-
-RUN npm ci --only=production
+# The node-pty module will now compile successfully
+RUN npm ci --omit=dev
 
 # Set environment variables (These are what Dockerode will 'peek' at)
 ENV NODE_ENV=production

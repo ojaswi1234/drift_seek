@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"next dev\" \"redis-server --save --appendonly yes\" \"node --watch terminal-server/server.ts\"",
+    "dev": "concurrently \"next dev\" \"redis-server --save --appendonly yes\" \"npm --prefix terminal-server start\"",
     "setup": "npm install && npm --prefix terminal-server install",
+    "dev:terminal-server": "npm --prefix terminal-server start",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
