@@ -4,6 +4,7 @@ import { Server } from "socket.io";
 import * as pty from "node-pty";
 import dotenv from "dotenv";
 import path from 'path';
+import { execSync } from "child_process";
 //import os from "os";
 dotenv.config();
 
@@ -17,7 +18,21 @@ const io = new Server(httpServer, {
   },
 });
 
+
+
 function startServer() {
+  const targetContainer = "ubuntu:latest";
+  
+  console.log(`Pre-pulling ${targetContainer} to ensure clean terminal starts...`);
+  try {
+    // stdio: 'ignore' prevents the messy logs from printing to your PM2 logs
+    execSync(`docker pull ${targetContainer}`, { stdio: 'ignore' });
+    console.log("Docker image is cached and ready!");
+  } catch (err) {
+    console.error("Warning: Failed to pre-pull image. It will pull on first connection.", err);
+  }
+
+
   io.on("connection", (socket) => {
     console.log("Secure Shell Session Started:", socket.id);
 
