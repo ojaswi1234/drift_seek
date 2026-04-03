@@ -36,7 +36,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:3000
+      NEXT_PUBLIC_API_BASE_URL: https://expert-train-6p67vjvvjrpcr6gw-3000.app.github.dev
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
@@ -55,9 +55,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      NEXTAUTH_URL: http://localhost:3000
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:3000
-      NEXT_PUBLIC_SERVER_BASE_URL: http://localhost:3001
+      NEXTAUTH_URL: https://expert-train-6p67vjvvjrpcr6gw-3000.app.github.dev/api/auth/callback/github
+      NEXT_PUBLIC_API_BASE_URL: https://expert-train-6p67vjvvjrpcr6gw-3000.app.github.dev
+      NEXT_PUBLIC_SERVER_BASE_URL: https://expert-train-6p67vjvvjrpcr6gw-3001.app.github.dev
       MONGODB_URI: mongodb://mongo:27017/system_seek
       REDIS_URL: redis://redis:6379
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me}

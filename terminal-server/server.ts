@@ -23,7 +23,7 @@ function startServer() {
     let ptyProcess: pty.IPty | null = null;
 
     try {
-      const shell = os.platform() === "win32" ? "powershell.exe" : "bash";
+      const shell =  "sh";
       const customUser = socket.handshake.auth.username || "drift_user";
   const targetContainer = "ubuntu:latest"; 
 

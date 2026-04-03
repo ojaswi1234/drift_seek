@@ -20,7 +20,7 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 # FIX: Install Python and build tools so node-pty can compile in the runner stage
-RUN apk add --no-cache python3 make g++ linux-headers
+RUN apk add --no-cache python3 make g++ linux-headers bash
 
 # Copy only the necessary files from the builder stage
 COPY --from=builder /app/next.config.ts ./
