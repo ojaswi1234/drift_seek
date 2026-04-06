@@ -143,8 +143,6 @@ process.on("unhandledRejection", (reason) => {
 });
 
 
-
-
 app.get("/", (req, res) => {
   res.send("Handyman Terminal Server is running.");
 });
