@@ -25,12 +25,13 @@ export default function TeamRoomModal({
 
   if (!isOpen) return null;
 
-  const[user, setUsers] = useState([{id: "", role: ""}])
+  const[user, setUsers] = useState<{id: string, role: string}[]>([]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setUsers([...user, {id: memberIdInput, role: memberRoleInput}])
-    onCancel();
+    setUsers([...user, {id: memberIdInput, role: memberRoleInput}]);
+    onMemberIdChange("");
+    onMemberRoleChange("");
   };
 
   return (
@@ -50,30 +51,34 @@ export default function TeamRoomModal({
         <ul className="mb-4">
             {
                 user.map((user, index) => (
-              <li className="text-xs text-zinc-400 mb-1"> 
+              <li key={index} className="text-xs text-zinc-400 mb-1"> 
                 <span className="font-semibold text-emerald-500">{user.id}</span> - <span className="text-cyan-500">{user.role}</span>
               </li>
                 ))
-}
+            }
         </ul>
 
         <form
-          onSubmit={handleSubmit}
-        >
+          onSubmit={handleSubmit}>
           <input
             autoFocus
             className="w-full bg-[#0c0c0c] border border-zinc-800 rounded-lg px-4 py-2.5 text-zinc-200 font-mono text-sm mb-6 outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all placeholder-zinc-700"
-            placeholder="e.g. core-platform-ops"
+            placeholder="Enter Github Username...."
             value={memberIdInput}
             onChange={(e) => onMemberIdChange(e.target.value)}
           />
-          <input
+          <select
             autoFocus
             className="w-full bg-[#0c0c0c] border border-zinc-800 rounded-lg px-4 py-2.5 text-zinc-200 font-mono text-sm mb-6 outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all placeholder-zinc-700"
-            placeholder="e.g. core-platform-ops"
             value={memberRoleInput}
             onChange={(e) => onMemberRoleChange(e.target.value)}
-          />
+         
+          >
+            <option value="" disabled defaultChecked>Select Role....</option>
+            <option value="Editor">Editor</option>
+            <option value="Viewer">Viewer</option>
+            
+          </select>
           
           <div className="flex justify-end gap-3">
             <button

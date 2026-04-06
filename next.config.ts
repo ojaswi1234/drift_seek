@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   compiler: {
     styledComponents: true,
   },
+ 
+    allowedDevOrigins: ['3000-firebase-driftseekgit-1775514209589.cluster-sumfw3zmzzhzkx4mpvz3ogth4y.cloudworkstations.dev'],
+    
   images: {
     remotePatterns: [
       {

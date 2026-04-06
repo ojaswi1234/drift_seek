@@ -121,9 +121,16 @@ const args = [
     });
   });
 
-  const port = process.env.PORT || 3001;
-  httpServer.listen(port, () => {
-    console.log(`Handyman Terminal running on port ${port}`);
+  const argv = process.argv.slice(2);
+  const portArg = argv.indexOf('--port');
+  const hostArg = argv.indexOf('--hostname');
+
+  const port = portArg !== -1 && argv[portArg + 1] ? parseInt(argv[portArg + 1], 10) : (process.env.PORT ? parseInt(process.env.PORT, 10) : 3001);
+  const hostname = hostArg !== -1 && argv[hostArg + 1] ? argv[hostArg + 1] : '0.0.0.0';
+
+
+  httpServer.listen(port, hostname, () => {
+    console.log(`Handyman Terminal running on http://${hostname}:${port}`);
   });
 }
 
