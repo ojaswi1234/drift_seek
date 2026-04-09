@@ -6,6 +6,7 @@ import redis from "@/lib/redis";
 import { getServerSession } from "next-auth/next";
 // UPDATE THIS PATH TO MATCH YOUR NEXTAUTH CONFIG LOCATION:
 import { authOptions } from "@/app/api/auth/[...nextauth]/route"; 
+import { isMaliciousUrl, logMaliciousAttempt } from "@/lib/securityAgent";
 
 export const dynamic = 'force-dynamic';
 
@@ -70,6 +71,12 @@ export async function POST(req: NextRequest): Promise<Response> {
     let cleanUrl = body.url as string;
     if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
       cleanUrl = `https://${cleanUrl}`; // Auto-append https if missing
+    }
+
+    if (isMaliciousUrl(cleanUrl)) {
+      const ip = req.headers.get("x-forwarded-for") || req.ip || null;
+      await logMaliciousAttempt(ip, cleanUrl, session?.user?.email || "UNKNOWN");
+      return NextResponse.json({ message: "Forbidden: Malicious URL detected." }, { status: 403 });
     }
 
     // Optional: Strictly validate it's a real URL format before saving

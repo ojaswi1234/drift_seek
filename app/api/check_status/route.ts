@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
+import { isMaliciousUrl, logMaliciousAttempt } from "@/lib/securityAgent";
 
-const execPromise = promisify(exec);
+const execFilePromise = promisify(execFile);
 
 /**
  * Runs a specialized curl command to get a network trace
@@ -13,9 +14,11 @@ const execPromise = promisify(exec);
  */
 async function runDiagnostic(url: string) {
   try {
-    const { stdout } = await execPromise(
-      `curl -s -o /dev/null -w "DNS: %{time_namelookup}s | TCP: %{time_connect}s | TLS: %{time_appconnect}s | TTFB: %{time_starttransfer}s" "${url}"`
-    );
+    const { stdout } = await execFilePromise("curl", [
+      "-s", "-o", "/dev/null", "-w",
+      "DNS: %{time_namelookup}s | TCP: %{time_connect}s | TLS: %{time_appconnect}s | TTFB: %{time_starttransfer}s",
+      url
+    ]);
     return stdout;
   } catch (err) {
     return "DIAGNOSTIC_UNAVAILABLE";
@@ -37,6 +40,12 @@ export async function GET(request: NextRequest) {
   let urlToFetch = targetUrl;
   if (!urlToFetch.startsWith('http://') && !urlToFetch.startsWith('https://')) {
     urlToFetch = 'https://' + urlToFetch;
+  }
+
+  if (isMaliciousUrl(urlToFetch)) {
+    const ip = request.headers.get("x-forwarded-for") || request.ip || null;
+    await logMaliciousAttempt(ip, urlToFetch);
+    return NextResponse.json({ message: "Forbidden: Malicious URL detected." }, { status: 403 });
   }
 
   try {
