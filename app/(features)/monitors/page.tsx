@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 import GlobalLoader from "@/components/GlobalLoader";
 import GithubRepoModal, { GitHubRepo } from "@/components/modals/githubRepos/githubrepoModal";
 import { io, Socket } from "socket.io-client";
-import { Activity, Clock, Terminal, Zap, GitBranch } from "lucide-react";
+import { Activity, Clock, Terminal, Zap, GitBranch, RefreshCw } from "lucide-react";
 
 type MonitorSocketPayload = {
   id: string;
@@ -71,8 +71,32 @@ export default function Page() {
       .finally(() => setIsLoading(false));
   };
 
+  // --- NEW: FETCH STRESS TEST RESULTS ---
+  const fetchContainerResults = () => {
+    fetch("/api/pipelines/results") // Ensure this API endpoint exists to fetch from StressTestLogs
+      .then(res => res.json())
+      .then((data) => {
+        if (data.success) {
+          // Flatten the nested results if your schema is repo-based
+          const flattened = data.results.flatMap((repo: any) => 
+            repo.stressTests.map((test: any) => ({
+              githubUrl: repo.githubUrl,
+              metrics: test,
+              testedAt: test.testedAt
+            }))
+          ).sort((a: any, b: any) => new Date(b.testedAt).getTime() - new Date(a.testedAt).getTime());
+          
+          setContainer(flattened);
+        }
+      })
+      .catch((err) => console.error("Error fetching stress logs:", err));
+  };
+
   React.useEffect(() => {
-    if (status === "authenticated") fetchMonitors();
+    if (status === "authenticated") {
+      fetchMonitors();
+      fetchContainerResults(); // Load historical results on mount
+    }
   }, [status]);
 
   React.useEffect(() => {
@@ -173,17 +197,19 @@ export default function Page() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to execute pipeline');
+        throw new Error(data.error || 'Failed to start pipeline');
       }
 
-      // Add the successful test result to the container list UI
-      setContainer(prev => [
-        { githubUrl, metrics: data.metrics, testedAt: new Date().toISOString() },
-        ...prev
-      ]);
+      // ASYNC UPDATE: The pipeline has started. 
+      // We keep the "Active" status for ~60s before allowing another run.
+      setTimeout(() => {
+        setIsEngineRunning(false);
+        setEngineTarget(null);
+        fetchContainerResults(); // Refresh list to see if results arrived
+      }, 60000);
+
     } catch (err: any) {
       setEngineError(err.message);
-    } finally {
       setIsEngineRunning(false);
       setEngineTarget(null);
     }
@@ -262,13 +288,22 @@ export default function Page() {
 
         {/* RIGHT COLUMN: CONTAINERS & PIPELINES */}
         <aside className="w-full lg:w-1/2 flex flex-col h-full min-h-0">
-          <button 
-            className="shrink-0 self-end mb-6 px-6 py-3 bg-black text-white uppercase text-sm tracking-widest hover:bg-zinc-800 transition-all cursor-pointer"
-            onClick={handleOpenGithubModal}
-            disabled={isEngineRunning}
-          >
-            + Add Container
-          </button>
+          <div className="flex justify-between items-center mb-6">
+            <button 
+              onClick={fetchContainerResults}
+              className="p-2 text-gray-400 hover:text-black transition-colors"
+              title="Refresh Results"
+            >
+              <RefreshCw size={20} />
+            </button>
+            <button 
+              className="px-6 py-3 bg-black text-white uppercase text-sm tracking-widest hover:bg-zinc-800 transition-all cursor-pointer"
+              onClick={handleOpenGithubModal}
+              disabled={isEngineRunning}
+            >
+              + Add Container
+            </button>
+          </div>
           
           {engineError && (
              <div className="shrink-0 mb-4 bg-red-50 text-red-600 p-3 rounded-lg border border-red-200 text-sm font-sans">
@@ -284,6 +319,7 @@ export default function Page() {
                 Cloning & testing in Ephemeral Sandbox:<br/>
                 <span className="font-bold">{engineTarget}</span>
               </p>
+              <p className="text-[10px] text-emerald-500 mt-2 italic">Results will appear shortly.</p>
             </div>
           ) : container.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center min-h-[250px] border-2 border-dashed border-gray-200 rounded-lg p-6">
@@ -293,7 +329,7 @@ export default function Page() {
               </p>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-10">
+            <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-10 scrollbtn">
               {container.map((item, index) => (
                 <ContainerMetricCard key={index} data={item} />
               ))}
@@ -352,7 +388,7 @@ function ContainerMetricCard({ data }: { data: any }) {
           </div>
           <div>
             <div className="text-xs text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Zap size={12}/> Req/Sec</div>
-            <div className="font-bold text-gray-900">{metrics.requestsPerSecond.toFixed(1)}</div>
+            <div className="font-bold text-gray-900">{Number(metrics.requestsPerSecond).toFixed(1)}</div>
           </div>
           <div>
             <div className="text-xs text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Clock size={12}/> Avg ms</div>
@@ -360,7 +396,7 @@ function ContainerMetricCard({ data }: { data: any }) {
           </div>
           <div>
             <div className="text-xs text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Terminal size={12}/> p99 ms</div>
-            <div className="font-bold text-gray-900">{metrics.latency99th}</div>
+            <div className="font-bold text-gray-900">{metrics.latency99th || metrics.latency95th}</div>
           </div>
         </div>
       </div>

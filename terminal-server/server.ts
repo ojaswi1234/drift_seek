@@ -157,37 +157,25 @@ app.get("/", (req, res) => {
 
 app.post("/run-github-stress-test", express.json(), (req, res) => {
   const { githubUrl } = req.body;
-
-  // Basic security: Ensure it is a valid GitHub URL to prevent injection attacks
-  const githubUrlRegex = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
-  if (!githubUrl || !githubUrlRegex.test(githubUrl)) {
-    return res.status(400).json({ error: "Invalid GitHub URL format" });
+  if (!githubUrl || !githubUrl.startsWith("https://github.com/")) {
+    return res.status(400).json({ error: "Invalid GitHub URL" });
   }
 
-  console.log(`[STRESS ENGINE] Cloning and testing: ${githubUrl}`);
+  // 1. Respond to Vercel IMMEDIATELY
+  res.json({ success: true, message: "Pipeline started in background" });
 
-  // The massive chained command. 
-  // --rm ensures the container and the cloned code are permanently deleted the second this finishes.
-  // Update this specific line in terminal-server/server.ts
+  // 2. Run the heavy work in the background
   const command = `docker run --rm --memory="512m" --cpus="0.8" node:alpine sh -c "apk add --no-cache git && npm install -g autocannon && git clone ${githubUrl} /temp_app && cd /temp_app && npm install --legacy-peer-deps && (npm start &) && sleep 10 && autocannon -c 50 -a 2000 -j http://localhost:3000"`;
 
-  exec(command, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+  exec(command, { maxBuffer: 1024 * 1024 * 10 }, async (error, stdout, stderr) => {
     if (error) {
-      console.error(`[STRESS ENGINE FATAL]`, stderr);
-      
-      
-      const cleanError = stderr.trim().split('\n').slice(-3).join(' | ').replace(/"/g, "'");
-      
-      return res.status(500).json({ 
-        error: `Docker Crash: ${cleanError || error.message}` 
-      });
+       console.error(`[STRESS ENGINE FATAL]`, stderr);
+       return; 
     }
 
     try {
-      // Autocannon outputs detailed JSON
       const stats = JSON.parse(stdout) as any;
-      
-      const driftMetrics = {
+      const metrics = {
         totalRequests: stats.requests.sent,
         successRate: Number(((stats['2xx'] / stats.requests.sent) * 100).toFixed(2)),
         latencyAverage: stats.latency.average,
@@ -195,10 +183,15 @@ app.post("/run-github-stress-test", express.json(), (req, res) => {
         requestsPerSecond: stats.requests.average,
       };
 
-      res.json({ success: true, metrics: driftMetrics });
+      // 3. POST the results back to a NEW Vercel webhook or update DB directly
+      await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/pipelines/callback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ githubUrl, metrics })
+      });
+
     } catch (parseErr) {
-      res.status(500).json({ error: "Failed to parse stress test results." });
+      console.error("Failed to process background stats", parseErr);
     }
   });
 });
-
