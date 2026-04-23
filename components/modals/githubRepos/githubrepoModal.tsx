@@ -1,102 +1,105 @@
-import React, { useEffect, useState } from 'react'
-import "./githubrepo.css"
-import { useSession } from 'next-auth/react';
-import { redirect } from 'next/navigation';
-import { Github } from 'lucide-react';
+"use client";
 
+import React from 'react';
+import { GitFork, Star, Lock, X } from 'lucide-react';
 
+export interface GitHubRepo {
+  id: number;
+  name: string;
+  owner: { login: string };
+  html_url: string;
+  private: boolean;
+  stargazers_count: number;
+  forks_count: number;
+}
 
 interface GithubRepoModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSelectRepo: (url: string) => void; 
+  repos: GitHubRepo[]; 
+  isLoading: boolean;
 }
 
-const GithubRepoModal = ({ isOpen, onClose }: GithubRepoModalProps) => {
+export default function GithubRepoModal({ isOpen, onClose, onSelectRepo, repos, isLoading }: GithubRepoModalProps) {
+  if (!isOpen) return null;
 
-    const { status } = useSession({
-        required: true,
-        onUnauthenticated() {
-          redirect("/");
-        },
-      });
-
-      const[repos, setRepos] = useState([]);
-      const[loading, setLoading] = useState(false);
-
-
-    useEffect(() => {
-      const handleEscape = (event: KeyboardEvent) => {
-        if (event.key === "Escape") {
-          onClose();
-        }
-      };
-
-      if (isOpen) {
-        document.addEventListener("keydown", handleEscape);
-      }
-
-      return () => {
-        document.removeEventListener("keydown", handleEscape);
-      };
-    }, [isOpen, onClose]);
-
-    useEffect(() => {
-      if (isOpen && status === "authenticated") {
-        setLoading(true);
-        fetch("/api/github/repos")
-          .then(async (response) => {
-            const data = await response.json();
-            setRepos(data);
-            setLoading(false);
-          })
-          .catch(err => {
-            console.error("Error fetching repos:", err);
-            setLoading(false);
-          });
-      } else if (isOpen) {
-        setRepos([]);
-        setLoading(false);
-      }
-    }, [isOpen, status]);
-    
-    if (!isOpen) return null;
   return (
-    <div className="modal backdrop-blur-md">
-      <div className="modal-content">
-        <span className="close" onClick={onClose}>
-          ×
-        </span>
-        <div className="p-6 w-full h-full">
-        <div className="flex flex-col items-center gap-3 mb-6 w-full h-full">
-          <h2 className='font-bold text-xl'>Choose Github Repo you want to containerise</h2>
-         <input placeholder="Search repositories..." className="outline-none rounded p-2 mb-4 border-b-2 border-b-black mt-5" />
-          <div className="flex flex-col scrollbtn overflow-y-auto w-full h-full p-2 ">
-            {
-              loading ? (
-                <p className="text-gray-600 animate-pulse">Loading repositories...</p>
-              ) : (
-                repos.length > 0 ? (
-                  repos.map((repo: any) => (
-
-                  <div key={repo.id} className="py-4 px-5 border rounded mb-2 cursor-pointer hover:bg-gray-100 cardShadow flex flex-row gap-3 items-center">
-                    <Github size={24} />
-                    <h3 className="text-lg font-semibold">{repo.name}</h3>
-                    {/* <p className="text-sm text-gray-600">{repo.description}</p> */}
-                  </div>
-                ))
-              ) : (
-                <p>No repositories found.</p>
-              )
-              )
-            }
-         
-          </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white border border-gray-200 p-6 rounded-xl w-full max-w-xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 font-sans text-black">
+        
+        {/* Header matched to Monitor Page theme */}
+        <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+          <h2 className="text-xl font-bold font-orbitron tracking-wide text-black">
+            Select Repository
+          </h2>
+          <button 
+            onClick={onClose} 
+            className="p-1.5 text-gray-400 hover:text-black hover:bg-gray-100 rounded-md transition-all"
+          >
+            <X size={20} />
+          </button>
         </div>
+        
+        {/* Repository List */}
+        <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-2 scrollbtn">
+          {isLoading ? (
+             <div className="flex flex-col items-center justify-center py-12 text-gray-400 animate-pulse">
+                <GitFork size={32} className="mb-3 opacity-50" />
+                <span className="text-sm tracking-widest uppercase font-bold">Fetching GitHub Data...</span>
+             </div>
+          ) : repos.length === 0 ? (
+             <div className="text-center py-12 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-lg">
+                No repositories found on this account.
+             </div>
+          ) : (
+            repos.map((repo) => {
+              const targetUrl = `https://github.com/${repo.owner.login}/${repo.name}`;
+
+              return (
+                <button
+                  key={repo.id}
+                  onClick={() => {
+                    onSelectRepo(targetUrl);
+                    onClose();
+                  }}
+                  className="w-full flex flex-col text-left p-4 bg-white border border-gray-200 hover:border-black hover:shadow-md transition-all rounded-lg group"
+                >
+                  <div className="flex justify-between items-start mb-1.5 w-full">
+                    <span className="text-black font-bold text-sm flex items-center gap-2">
+                      {repo.private && <Lock size={14} className="text-gray-400" />}
+                      {repo.name}
+                    </span>
+                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                       <span className="flex items-center gap-1">
+                         <Star size={14} className="text-gray-400 group-hover:text-yellow-500 transition-colors"/> 
+                         {repo.stargazers_count}
+                       </span>
+                       <span className="flex items-center gap-1">
+                         <GitFork size={14} className="text-gray-400"/> 
+                         {repo.forks_count}
+                       </span>
+                    </div>
+                  </div>
+                  <span className="text-xs text-gray-500 font-mono truncate w-full group-hover:text-gray-800 transition-colors">
+                    {targetUrl}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+        
+        {/* Footer */}
+        <div className="mt-6 pt-4 border-t border-gray-100 flex justify-end">
+            <button 
+              onClick={onClose}
+              className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-black text-sm uppercase tracking-widest transition-colors font-bold"
+            >
+              Cancel
+            </button>
         </div>
       </div>
     </div>
-  )
+  );
 }
-
-export default GithubRepoModal;

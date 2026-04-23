@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 const StressTestLogsSchema = new mongoose.Schema({
+    githubUrl: { type: String, required: true },
     stressTests: [{
   testedAt: { type: Date, default: Date.now },
   requestsPerSecond: { type: Number },

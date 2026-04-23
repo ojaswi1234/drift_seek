@@ -1,34 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rateLimiter";
+import dbConnect from "@/lib/db_connect";
+import StressTestLogs from "@/lib/models/StressTestLogs";
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Enforce rate limiting: allow max 20 requests per 60 seconds
-    await checkRateLimit(req, 20);
+    // FATAL FLAW FIX: You allowed 20 requests per minute here originally. 
+    // If a user clicks this 20 times, your GCP server spins up 20 Node containers 
+    // and instantly crashes. Lowered to 2.
+    await checkRateLimit(req, 2); 
 
-    // 2. Your actual route logic here
-    const data = await req.json();
-    
-    return NextResponse.json({ 
-      success: true, 
-      message: "Pipeline triggered successfully!", 
-      data 
-    }, { status: 200 });
+    const { githubUrl } = await req.json();
+    if (!githubUrl) return NextResponse.json({ success: false, error: "Missing GitHub URL" }, { status: 400 });
 
-  } catch (error) {
-    // 3. Catch the specific rate limit error and return 429
-    if (error instanceof Error && error.message === "RATE_LIMIT_EXCEEDED") {
-      return NextResponse.json(
-        { success: false, error: "Too many requests, please try again later." },
-        { status: 429 }
-      );
+    // 1. Command GCP to execute the pipeline
+    // NOTE: Replace YOUR_GCP_IP in production with process.env.GCP_SERVER_URL
+    const server = process.env.NEXT_PUBLIC_SERVER_BASE_URL || "http://localhost:3001";
+    const gcpResponse = await fetch(server, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ githubUrl }),
+    });
+
+    const data = await gcpResponse.json();
+
+    if (!gcpResponse.ok || !data.success) {
+      return NextResponse.json({ success: false, error: data.error || "GCP Execution Failed" }, { status: 500 });
     }
 
-    // Handle other regular errors
+    // 2. Save stats to MongoDB
+    await dbConnect();
+    
+    // Find existing logs for this repo, or create a new one
+    let logDoc = await StressTestLogs.findOne({ githubUrl });
+    if (!logDoc) {
+      logDoc = new StressTestLogs({ githubUrl, stressTests: [] });
+    }
+
+    logDoc.stressTests.push({
+      requestsPerSecond: data.metrics.requestsPerSecond,
+      latencyAverage: data.metrics.latencyAverage,
+      latency99th: data.metrics.latency99th,
+      successRate: data.metrics.successRate,
+      totalRequests: data.metrics.totalRequests
+    });
+
+    await logDoc.save();
+
+    // 3. Return to UI
+    return NextResponse.json({ success: true, metrics: data.metrics }, { status: 200 });
+
+  } catch (error) {
+    if (error instanceof Error && error.message === "RATE_LIMIT_EXCEEDED") {
+      return NextResponse.json({ success: false, error: "Too many tests running. Cool down your server." }, { status: 429 });
+    }
     console.error("Pipeline trigger error:", error);
-    return NextResponse.json(
-      { success: false, error: "Internal Server Error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });
   }
 }
