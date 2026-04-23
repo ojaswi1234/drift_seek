@@ -159,8 +159,9 @@ app.post("/run-github-stress-test", express.json(), (req, res) => {
   const { githubUrl } = req.body;
 
   // Basic security: Ensure it is a valid GitHub URL to prevent injection attacks
-  if (!githubUrl || !githubUrl.startsWith("https://github.com/")) {
-    return res.status(400).json({ error: "Invalid GitHub URL" });
+  const githubUrlRegex = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+  if (!githubUrl || !githubUrlRegex.test(githubUrl)) {
+    return res.status(400).json({ error: "Invalid GitHub URL format" });
   }
 
   console.log(`[STRESS ENGINE] Cloning and testing: ${githubUrl}`);
@@ -177,7 +178,7 @@ app.post("/run-github-stress-test", express.json(), (req, res) => {
 
     try {
       // Autocannon outputs detailed JSON
-      const stats = JSON.parse(stdout) as any;;
+      const stats = JSON.parse(stdout) as any;
       
       const driftMetrics = {
         totalRequests: stats.requests.sent,

@@ -6,7 +6,8 @@ const StressTestLogsSchema = new mongoose.Schema({
   testedAt: { type: Date, default: Date.now },
   requestsPerSecond: { type: Number },
   latencyAverage: { type: Number },
-  latency95th: { type: Number },
+  latency99th: { type: Number },
+  totalRequests: { type: Number },
   successRate: { type: Number }
 }]
 });

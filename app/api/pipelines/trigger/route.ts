@@ -16,13 +16,20 @@ export async function POST(req: NextRequest) {
     // 1. Command GCP to execute the pipeline
     // NOTE: Replace YOUR_GCP_IP in production with process.env.GCP_SERVER_URL
     const server = process.env.NEXT_PUBLIC_SERVER_BASE_URL || "http://localhost:3001";
-    const gcpResponse = await fetch(server, {
+    const baseUrl = server.replace(/\/$/, "");
+    const gcpResponse = await fetch(`${baseUrl}/run-github-stress-test`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ githubUrl }),
+      signal: AbortSignal.timeout(60000), // Increase timeout explicitly
     });
 
-    const data = await gcpResponse.json();
+    let data;
+    try {
+      data = await gcpResponse.json();
+    } catch (parseError) {
+      return NextResponse.json({ success: false, error: "GCP Execution Failed or Timed Out (Invalid Response)" }, { status: 502 });
+    }
 
     if (!gcpResponse.ok || !data.success) {
       return NextResponse.json({ success: false, error: data.error || "GCP Execution Failed" }, { status: 500 });
