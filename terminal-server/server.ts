@@ -172,8 +172,14 @@ app.post("/run-github-stress-test", express.json(), (req, res) => {
 
   exec(command, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
     if (error) {
-      console.error(`Stress test failed: ${stderr}`);
-      return res.status(500).json({ error: "Pipeline failed. Check if repo requires build steps." });
+      console.error(`[STRESS ENGINE FATAL]`, stderr);
+      
+      
+      const cleanError = stderr.trim().split('\n').slice(-3).join(' | ').replace(/"/g, "'");
+      
+      return res.status(500).json({ 
+        error: `Docker Crash: ${cleanError || error.message}` 
+      });
     }
 
     try {
