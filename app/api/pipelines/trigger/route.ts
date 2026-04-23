@@ -57,11 +57,17 @@ export async function POST(req: NextRequest) {
     // 3. Return to UI
     return NextResponse.json({ success: true, metrics: data.metrics }, { status: 200 });
 
-  } catch (error) {
-    if (error instanceof Error && error.message === "RATE_LIMIT_EXCEEDED") {
+  }  catch (error: any) {
+    if (error.message === "RATE_LIMIT_EXCEEDED") {
       return NextResponse.json({ success: false, error: "Too many tests running. Cool down your server." }, { status: 429 });
     }
-    console.error("Pipeline trigger error:", error);
-    return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });
+    
+    console.error("[VERCEL API FATAL ERROR]:", error);
+    
+    // STOP HIDING THE ERROR. Send the raw Node.js error directly to the UI.
+    return NextResponse.json({ 
+      success: false, 
+      error: `Vercel API Crash: ${error.message || "Unknown Failure"}` 
+    }, { status: 500 });
   }
 }
