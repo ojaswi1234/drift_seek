@@ -5,6 +5,7 @@ import * as pty from "node-pty";
 import dotenv from "dotenv";
 import path from 'path';
 import { execSync } from "child_process";
+import { exec } from "child_process";
 //import os from "os";
 dotenv.config();
 
@@ -153,3 +154,43 @@ process.on("unhandledRejection", (reason) => {
 app.get("/", (req, res) => {
   res.send("Handyman Terminal Server is running.");
 });
+
+app.post("/run-github-stress-test", express.json(), (req, res) => {
+  const { githubUrl } = req.body;
+
+  // Basic security: Ensure it is a valid GitHub URL to prevent injection attacks
+  if (!githubUrl || !githubUrl.startsWith("https://github.com/")) {
+    return res.status(400).json({ error: "Invalid GitHub URL" });
+  }
+
+  console.log(`[STRESS ENGINE] Cloning and testing: ${githubUrl}`);
+
+  // The massive chained command. 
+  // --rm ensures the container and the cloned code are permanently deleted the second this finishes.
+  const command = `docker run --rm --memory="512m" --cpus="0.8" node:alpine sh -c "apk add --no-cache git && npm install -g autocannon && git clone ${githubUrl} /temp_app && cd /temp_app && npm install && (npm start &) && sleep 10 && autocannon -c 50 -a 2000 -j http://localhost:3000"`;
+
+  exec(command, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`Stress test failed: ${stderr}`);
+      return res.status(500).json({ error: "Pipeline failed. Check if repo requires build steps." });
+    }
+
+    try {
+      // Autocannon outputs detailed JSON
+      const stats = JSON.parse(stdout) as any;;
+      
+      const driftMetrics = {
+        totalRequests: stats.requests.sent,
+        successRate: Number(((stats['2xx'] / stats.requests.sent) * 100).toFixed(2)),
+        latencyAverage: stats.latency.average,
+        latency99th: stats.latency.p99,
+        requestsPerSecond: stats.requests.average,
+      };
+
+      res.json({ success: true, metrics: driftMetrics });
+    } catch (parseErr) {
+      res.status(500).json({ error: "Failed to parse stress test results." });
+    }
+  });
+});
+
