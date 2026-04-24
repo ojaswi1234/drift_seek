@@ -175,6 +175,7 @@ app.post("/run-github-stress-test", express.json(), (req, res) => {
 
     try {
       const stats = JSON.parse(stdout) as any;
+      console.log(`[DEBUG - PROOF OF LIFE] Autocannon successfully tested ${githubUrl}. Total Requests: ${stats.requests.sent}, Avg Latency: ${stats.latency.average}ms`);
       const metrics = {
         totalRequests: stats.requests.sent,
         successRate: Number(((stats['2xx'] / stats.requests.sent) * 100).toFixed(2)),
