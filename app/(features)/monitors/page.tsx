@@ -163,7 +163,6 @@ export default function Page() {
     };
   }, [status]);
 
-
   // --- CONTAINER / STRESS ENGINE LOGIC ---
   const handleOpenGithubModal = async () => {
     setIsGithubModalOpen(true);
@@ -214,7 +213,6 @@ export default function Page() {
       setEngineTarget(null);
     }
   };
-
 
   return (
     <div className="flex flex-col h-screen bg-white py-10 px-6 md:px-12 lg:px-44 font-orbitron text-black overflow-hidden">

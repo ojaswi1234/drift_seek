@@ -16,21 +16,20 @@ export async function POST(req: NextRequest) {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true" // 1. Bypasses the Ngrok HTML intercept trap
+        "ngrok-skip-browser-warning": "true" 
       },
       body: JSON.stringify({ githubUrl }),
     });
 
-    // 2. STOP blindly parsing JSON. Read the raw text first.
+    // STOP blindly parsing JSON. Read the raw text first.
     const responseText = await gcpResponse.text();
 
     let data;
     try {
       data = JSON.parse(responseText);
     } catch (parseError) {
-      // 3. If it is HTML, we catch it here and expose exactly what webpage intercepted the call
       console.error(`[GCP FETCH ERROR] Status: ${gcpResponse.status} | Raw Response:`, responseText.substring(0, 200));
-      throw new Error(`Backend returned HTML instead of JSON.  (Status ${gcpResponse.status})`);
+      throw new Error(`Backend returned HTML instead of JSON. (Status ${gcpResponse.status})`);
     }
 
     if (!gcpResponse.ok || !data.success) {
