@@ -148,6 +148,39 @@ app.post("/run-github-stress-test", express.json(), (req, res) => {
   exec(command, { maxBuffer: 1024 * 1024 * 10 }, async (error, stdout, stderr) => {
     if (error) {
        console.error(`[STRESS ENGINE FATAL]`, stderr);
+       return;
+    }
+
+    try {
+      if (!stdout || stdout.trim() === '') {
+        throw new Error('autocannon returned empty output');
+      }
+
+      const results = JSON.parse(stdout);
+      
+      const totalReqs = results.requests.total;
+      const successReqs = results['2xx'] || 0;
+      
+      const metrics = {
+        requestsPerSecond: results.requests.average,
+        latencyAverage: results.latency.average,
+        latency99th: results.latency.p99,
+        successRate: totalReqs > 0 ? (successReqs / totalReqs) * 100 : 0,
+        totalRequests: totalReqs
+      };
+
+      const serverUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
+      await fetch(`${serverUrl}/api/pipelines/callback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ githubUrl, metrics }),
+      });
+      console.log(`[STRESS ENGINE] Results dispatched for ${githubUrl}`);
+
+    } catch (parseError) {
+      console.error(`[STRESS ENGINE JSON PARSE ERROR]`, parseError);
+    }
+  });
        return; 
     }
 

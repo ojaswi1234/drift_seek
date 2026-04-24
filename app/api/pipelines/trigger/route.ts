@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
     const gcpResponse = await fetch(`${server}/run-github-stress-test`, {
       method: "POST",
       headers: { 
+        ...Object.fromEntries(req.headers),
         "Content-Type": "application/json",
         "ngrok-skip-browser-warning": "true" 
       },
@@ -28,12 +29,21 @@ export async function POST(req: NextRequest) {
     try {
       data = JSON.parse(responseText);
     } catch (parseError) {
+      if (gcpResponse.status === 502 || responseText.includes("<!DOCTYPE html>")) {
+        console.error(`[GCP FETCH ERROR] Reverse proxy issue. Status: ${gcpResponse.status}.`);
+        return NextResponse.json({ success: false, error: "Cloud backend proxy is returning HTML (likely ngrok or gateway issue)." }, { status: gcpResponse.status });
+      }
       console.error(`[GCP FETCH ERROR] Status: ${gcpResponse.status} | Raw Response:`, responseText.substring(0, 200));
-      throw new Error(`Backend returned HTML instead of JSON. (Status ${gcpResponse.status})`);
+      return NextResponse.json({ success: false, error: `Backend returned non-JSON. (Status ${gcpResponse.status})` }, { status: 500 });
     }
 
-    if (!gcpResponse.ok || !data.success) {
-      return NextResponse.json({ success: false, error: data.error || "server error" }, { status: gcpResponse.status });
+    if (!gcpResponse.ok) {
+      const isHTML = responseText.includes("<!DOCTYPE html>");
+      return NextResponse.json({ success: false, error: isHTML ? "Reverse proxy crash. Ngrok might be down." : data?.error || "server error" }, { status: gcpResponse.status });
+    }
+
+    if (!data?.success) {
+      return NextResponse.json({ success: false, error: data?.error || "server error" }, { status: gcpResponse.status });
     }
 
     return NextResponse.json({ success: true, message: "Pipeline started" }, { status: 200 });

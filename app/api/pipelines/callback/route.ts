@@ -14,23 +14,26 @@ export async function POST(req: NextRequest) {
     // Connect to the database
     await dbConnect();
     
-    // Find existing logs for this repo, or create a new one
-    let logDoc = await StressTestLogs.findOne({ githubUrl });
-    if (!logDoc) {
-      logDoc = new StressTestLogs({ githubUrl, stressTests: [] });
+    const updateResult = await StressTestLogs.findOneAndUpdate(
+      { githubUrl },
+      {
+        $push: {
+          stressTests: {
+            requestsPerSecond: metrics.requestsPerSecond,
+            latencyAverage: metrics.latencyAverage,
+            latency99th: metrics.latency99th || metrics.latency95th,
+            successRate: metrics.successRate,
+            totalRequests: metrics.totalRequests,
+            testedAt: new Date()
+          }
+        }
+      },
+      { upsert: true, new: true }
+    );
+
+    if (!updateResult) {
+      throw new Error("Failed to upsert metric");
     }
-
-    // Safely save the metrics sent from GCP
-    logDoc.stressTests.push({
-      requestsPerSecond: metrics.requestsPerSecond,
-      latencyAverage: metrics.latencyAverage,
-      latency99th: metrics.latency99th || metrics.latency95th,
-      successRate: metrics.successRate,
-      totalRequests: metrics.totalRequests,
-      testedAt: new Date()
-    });
-
-    await logDoc.save();
 
     return NextResponse.json({ success: true, message: "Metrics saved successfully" }, { status: 200 });
 

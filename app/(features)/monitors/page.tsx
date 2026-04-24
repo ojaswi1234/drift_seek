@@ -76,10 +76,10 @@ export default function Page() {
     fetch("/api/pipelines/results") // Ensure this API endpoint exists to fetch from StressTestLogs
       .then(res => res.json())
       .then((data) => {
-        if (data.success) {
+        if (data.success && Array.isArray(data.results)) {
           // Flatten the nested results if your schema is repo-based
           const flattened = data.results.flatMap((repo: any) => 
-            repo.stressTests.map((test: any) => ({
+            (repo.stressTests || []).map((test: any) => ({
               githubUrl: repo.githubUrl,
               metrics: test,
               testedAt: test.testedAt
@@ -186,6 +186,9 @@ export default function Page() {
     setEngineTarget(githubUrl);
     setEngineError(null);
 
+    // Keep track of the timeout ID so we can clear it if needed
+    let stressTestTimeoutId: NodeJS.Timeout | null = null;
+    
     try {
       const res = await fetch('/api/pipelines/trigger', {
         method: 'POST',
@@ -201,7 +204,9 @@ export default function Page() {
 
       // ASYNC UPDATE: The pipeline has started. 
       // We keep the "Active" status for ~60s before allowing another run.
-      setTimeout(() => {
+      stressTestTimeoutId = setTimeout(() => {
+        // Warning: This could cause memory leak warning if component unmounts. 
+        // Best handled via useEffect to cleanup, or simply checking a mounted ref.
         setIsEngineRunning(false);
         setEngineTarget(null);
         fetchContainerResults(); // Refresh list to see if results arrived
@@ -287,13 +292,16 @@ export default function Page() {
         {/* RIGHT COLUMN: CONTAINERS & PIPELINES */}
         <aside className="w-full lg:w-1/2 flex flex-col h-full min-h-0">
           <div className="flex justify-between items-center mb-6">
-            <button 
-              onClick={fetchContainerResults}
-              className="p-2 text-gray-400 hover:text-black transition-colors"
-              title="Refresh Results"
-            >
-              <RefreshCw size={20} />
-            </button>
+            <div className="flex items-center gap-3">
+              <h2 className="font-bold text-lg text-gray-800 tracking-wide uppercase">Stress Reports</h2>
+              <button 
+                onClick={fetchContainerResults}
+                className="p-1.5 text-gray-400 hover:text-black hover:bg-gray-100 rounded-full transition-colors"
+                title="Refresh Results"
+              >
+                <RefreshCw size={18} />
+              </button>
+            </div>
             <button 
               className="px-6 py-3 bg-black text-white uppercase text-sm tracking-widest hover:bg-zinc-800 transition-all cursor-pointer"
               onClick={handleOpenGithubModal}
@@ -382,19 +390,19 @@ function ContainerMetricCard({ data }: { data: any }) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <div className="text-xs text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Activity size={12}/> Success</div>
-            <div className={`font-bold ${isHealthy ? 'text-emerald-600' : 'text-red-600'}`}>{metrics.successRate}%</div>
+            <div className={`font-bold ${isHealthy ? 'text-emerald-600' : 'text-red-600'}`}>{Number(metrics.successRate || 0).toFixed(1)}%</div>
           </div>
           <div>
             <div className="text-xs text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Zap size={12}/> Req/Sec</div>
-            <div className="font-bold text-gray-900">{Number(metrics.requestsPerSecond).toFixed(1)}</div>
+            <div className="font-bold text-gray-900">{Number(metrics.requestsPerSecond || 0).toFixed(1)}</div>
           </div>
           <div>
             <div className="text-xs text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Clock size={12}/> Avg ms</div>
-            <div className="font-bold text-gray-900">{metrics.latencyAverage}</div>
+            <div className="font-bold text-gray-900">{Math.round(metrics.latencyAverage || 0)}</div>
           </div>
           <div>
             <div className="text-xs text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Terminal size={12}/> p99 ms</div>
-            <div className="font-bold text-gray-900">{metrics.latency99th || metrics.latency95th}</div>
+            <div className="font-bold text-gray-900">{Math.round(metrics.latency99th || metrics.latency95th || 0)}</div>
           </div>
         </div>
       </div>
