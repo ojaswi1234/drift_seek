@@ -56,7 +56,7 @@ function TerminalInstance({
   useEffect(() => {
     try {
       socketRef.current = io(
-        process.env.NEXT_PUBLIC_SERVER_BASE_URL || "http://localhost:3001",
+        process.env.GCP_BACKEND_URL || "http://localhost:3001",
         {
           transports: ["polling", "websocket"],
           auth: { username: sysName },

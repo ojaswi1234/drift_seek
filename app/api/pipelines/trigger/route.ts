@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     if (!githubUrl) return NextResponse.json({ success: false, error: "Missing GitHub URL" }, { status: 400 });
 
     // Ensure no trailing slashes ruin the URL
-    let server = process.env.NEXT_PUBLIC_SERVER_BASE_URL || "http://localhost:3001";
+    let server = process.env.GCP_BACKEND_URL || "http://localhost:3001";
     if (server.endsWith('/')) server = server.slice(0, -1);
 
     const gcpResponse = await fetch(`${server}/run-github-stress-test`, {
