@@ -133,7 +133,16 @@ app.get("/", (req, res) => {
   res.send("Handyman Terminal Server is running.");
 });
 
-app.post("/run-github-stress-test", express.json(), (req, res) => {
+// --- CRITICAL FIX 1: Apply JSON parser globally ---
+app.use(express.json());
+
+app.post("/run-github-stress-test", (req, res) => {
+  
+  // --- CRITICAL FIX 2: Prevent the Node.js HTML Crash ---
+  if (!req.body) {
+    return res.status(400).json({ success: false, error: "Missing JSON body. This is usually caused by an HTTP -> HTTPS redirect dropping the payload." });
+  }
+
   const { githubUrl } = req.body;
   if (!githubUrl || !githubUrl.startsWith("https://github.com/")) {
     return res.status(400).json({ error: "Invalid GitHub URL" });
