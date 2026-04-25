@@ -156,43 +156,18 @@ app.post("/run-github-stress-test", express.json(), (req, res) => {
         throw new Error('autocannon returned empty output');
       }
 
-      const results = JSON.parse(stdout);
-      
-      const totalReqs = results.requests.total;
-      const successReqs = results['2xx'] || 0;
-      
-      const metrics = {
-        requestsPerSecond: results.requests.average,
-        latencyAverage: results.latency.average,
-        latency99th: results.latency.p99,
-        successRate: totalReqs > 0 ? (successReqs / totalReqs) * 100 : 0,
-        totalRequests: totalReqs
-      };
-
-      const serverUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
-      await fetch(`${serverUrl}/api/pipelines/callback`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ githubUrl, metrics }),
-      });
-      console.log(`[STRESS ENGINE] Results dispatched for ${githubUrl}`);
-
-    } catch (parseError) {
-      console.error(`[STRESS ENGINE JSON PARSE ERROR]`, parseError);
-    }
-  });
-       return; 
-    }
-
-    try {
       // Find the first occurrence of '{' to ensure we only parse the clean JSON object
       const cleanStdout = stdout.substring(stdout.indexOf('{'));
       const stats = JSON.parse(cleanStdout) as any;
       
       console.log(`[DEBUG - PROOF OF LIFE] Autocannon successfully tested ${githubUrl}. Total Requests: ${stats.requests.sent}, Avg Latency: ${stats.latency.average}ms`);
+      
+      const totalReqs = stats.requests.sent || stats.requests.total || 0;
+      const successReqs = stats['2xx'] || 0;
+      
       const metrics = {
-        totalRequests: stats.requests.sent,
-        successRate: Number(((stats['2xx'] / stats.requests.sent) * 100).toFixed(2)),
+        totalRequests: totalReqs,
+        successRate: totalReqs > 0 ? Number(((successReqs / totalReqs) * 100).toFixed(2)) : 0,
         latencyAverage: stats.latency.average,
         latency99th: stats.latency.p99,
         requestsPerSecond: stats.requests.average,
@@ -207,13 +182,14 @@ app.post("/run-github-stress-test", express.json(), (req, res) => {
       })
       .then(res => {
          if (!res.ok) console.error("[STRESS ENGINE] Vercel rejected the callback payload.", res.status);
-         else console.log("[STRESS ENGINE] Callback successful. Data saved to MongoDB.");
+         else console.log(`[STRESS ENGINE] Results dispatched for ${githubUrl}. Data saved to MongoDB.`);
       })
       .catch(err => {
          console.error("[STRESS ENGINE FATAL] Could not reach Vercel API:", err.message);
       });
-    } catch (parseErr) {
-      console.error("Failed to process background stats", parseErr);
+
+    } catch (parseError) {
+      console.error(`[STRESS ENGINE JSON PARSE ERROR]`, parseError);
       console.error("RAW STDOUT:", stdout.substring(0, 200));
     }
   });
