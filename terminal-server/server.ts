@@ -153,7 +153,7 @@ app.post("/run-github-stress-test", (req, res) => {
 
   // 2. Run the heavy work in the background, SILENCING all logs except autocannon JSON
   // 2. Run the heavy work in the background, SILENCING all logs except autocannon JSON
-  const command = `docker run --rm --memory="512m" --cpus="0.8" node:alpine sh -c "apk add --no-cache git > /dev/null 2>&1 && npm install -g autocannon > /dev/null 2>&1 && git clone ${githubUrl} /temp_app > /dev/null 2>&1 && cd /temp_app && npm install --legacy-peer-deps > /dev/null 2>&1 && npm run build --if-present > /dev/null 2>&1 && (npm start > /dev/null 2>&1 &) && sleep 15 && autocannon -c 50 -a 2000 -j http://localhost:3000"`;
+  const command = `docker run --rm --memory="256m" --cpus="0.5" node:alpine sh -c "apk add --no-cache git > /dev/null 2>&1 && npm install -g autocannon > /dev/null 2>&1 && git clone ${githubUrl} /temp_app > /dev/null 2>&1 && cd /temp_app && npm install --legacy-peer-deps > /dev/null 2>&1 && npm run build --if-present > /dev/null 2>&1 && (npm start > /dev/null 2>&1 &) && sleep 15 && autocannon -c 50 -a 2000 -j http://localhost:3000"`;
 
   exec(command, { maxBuffer: 1024 * 1024 * 10 }, async (error, stdout, stderr) => {
     if (error) {
