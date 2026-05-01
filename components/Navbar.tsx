@@ -3,7 +3,7 @@ import { Workflow, LogOut, User, Activity, Container, GitBranch, Terminal, Shiel
 import { signOut, useSession } from 'next-auth/react';
 import { useState } from 'react';
 import Image from 'next/image';
-import Link from 'next/link'; // 1. IMPORT LINK
+import Link from 'next/link'; 
 
 const Navbar = () => {
   const { data: session } = useSession();
@@ -16,7 +16,7 @@ const Navbar = () => {
     { id: 'drift', icon: <Search size={24} strokeWidth={1.5} />, label: 'DRIFT_ENGINE', url: "#"},
     { id: 'console', icon: <Terminal size={24} strokeWidth={1.5} />, label: 'WEB_SHELL', url: "/console" },
     { id: 'jenkins', icon: <Bot size={24} strokeWidth={1.5} />, label: 'AUTO_FIXES', url: "/pipelines" },
-    { id: 'security', icon: <ShieldAlert size={24} strokeWidth={1.5} />, label: 'SECURITY', url: "#" }, 
+    { id: 'security', icon: <ShieldAlert size={24} strokeWidth={1.5} />, label: 'SECURITY', url: "/security" }, 
   ];
 
   return (
@@ -64,6 +64,7 @@ const Navbar = () => {
                     alt="Profile"
                     width={32}
                     height={32}
+                    loading="eager"
                   />
                 )}
               </button>

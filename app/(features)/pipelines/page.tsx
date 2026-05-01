@@ -2,7 +2,9 @@ import React from 'react'
 
 function Page() {
   return (
-    <div>Page</div>
+    <div className='w-screen h-full bg-white flex justify-center items-center'>
+        <h1>This is pipelines page...</h1>
+    </div>
   )
 }
 
