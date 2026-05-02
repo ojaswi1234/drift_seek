@@ -33,6 +33,7 @@ function startServer() {
   io.on("connection", (socket) => {
     console.log("Secure Shell Session Started:", socket.id);
     let ptyProcess: pty.IPty | null = null;
+    const containerName = `drift_shell_${socket.id}`;
 
     try {
       const customUser = socket.handshake.auth.username || "drift_user";
@@ -43,7 +44,7 @@ function startServer() {
       const command = "docker";
 
       const args = [
-        "run", "--rm", "-it", "--memory", "256m", "--cpus", "0.5",
+        "run", "--rm", "-it", "--name", containerName, "--memory", "256m", "--cpus", "0.5",
         "-v", `${hostRepoPath}:/projects`, 
         "-w", "/projects",
         "-e", "TERM=xterm-256color",
@@ -97,6 +98,13 @@ function startServer() {
       console.log("Session Ended:", socket.id);
       try {
         ptyProcess?.kill();
+        exec(`docker rm -f ${containerName}`, (error, stdout, stderr) => {
+          if (error) {
+            console.log(`Container ${containerName} cleanup error (may have already exited): ${error.message}`);
+          } else {
+            console.log(`Successfully removed container ${containerName}`);
+          }
+        });
       } catch (err) {
         console.error("Failed to kill shell process:", err);
       }
