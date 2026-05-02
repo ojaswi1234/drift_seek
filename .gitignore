@@ -56,3 +56,8 @@ node_modules/
 /appendonlydir
 /appendonlydir/*
 dump.rdb
+
+
+#genkit
+.genkit
+/.genkit/*
