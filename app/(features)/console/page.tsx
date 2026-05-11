@@ -199,9 +199,9 @@ function TerminalInstance({
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <div className={`w-1.5 h-1.5 rounded-full ${isShellConnected ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" : "bg-red-500"}`} />
-            <span className={`text-xs font-mono ${themeMode === "dark" ? "text-zinc-400" : "text-zinc-600"}`}>{isShellConnected ? "CONNECTED" : "OFFLINE"}</span>
+            <span className={`text-xs font-mono ${themeMode === "dark" ? "text-zinc-400" : "text-zinc-800"}`}>{isShellConnected ? "CONNECTED" : "OFFLINE"}</span>
           </div>
-          <span className={`text-xs font-mono ${themeMode === "dark" ? "text-zinc-600" : "text-zinc-500"}`}>DIR: {currentDir}</span>
+          <span className={`text-xs font-mono ${themeMode === "dark" ? "text-zinc-600" : "text-zinc-800 font-medium"}`}>DIR: {currentDir}</span>
         </div>
         {mode === "team" && roomId && (
           <div className="flex items-center gap-2">
@@ -215,7 +215,7 @@ function TerminalInstance({
       <div
         ref={scrollRef}
         className={`flex-1 p-6 overflow-y-auto font-mono text-sm custom-scrollbar ${
-          themeMode === "dark" ? "text-zinc-300" : "text-zinc-800"
+          themeMode === "dark" ? "text-zinc-300" : "text-zinc-900"
         }`}
       >
         <div className="mb-8 opacity-90 text-xs">
@@ -226,11 +226,11 @@ function TerminalInstance({
           >
             Drift_Seeker
           </div>
-          <div className={`space-y-1 font-mono ${themeMode === "dark" ? "text-zinc-400" : "text-zinc-600"}`}>
+          <div className={`space-y-1 font-mono ${themeMode === "dark" ? "text-zinc-400" : "text-zinc-800 font-medium"}`}>
             <p>Welcome to DriftSeeker Terminal [Instance: {tabId}]</p>
             <p>
               Authorized User: {userName}{" "}
-              <span className="text-zinc-600">({mode.toUpperCase()} MODE)</span>
+              <span className={themeMode === "dark" ? "text-zinc-600" : "text-zinc-700 font-bold"}>({mode.toUpperCase()} MODE)</span>
             </p>
           </div>
           <div className="h-px w-24 bg-linear-to-r from-emerald-500/50 to-transparent my-4" />
@@ -238,7 +238,7 @@ function TerminalInstance({
 
         <div className="space-y-1.5 mb-4 relative z-10">
           {history.map((line, i) => (
-            <p key={i} className={line.startsWith(`${sysName}:`) || line.includes("[client]") ? "text-zinc-500" : (themeMode === "dark" ? "text-green-500 whitespace-pre-wrap" : "text-emerald-500 whitespace-pre-wrap")}>
+            <p key={i} className={line.startsWith(`${sysName}:`) || line.includes("[client]") ? (themeMode === "dark" ? "text-zinc-500" : "text-zinc-600 font-medium") : (themeMode === "dark" ? "text-green-500 whitespace-pre-wrap" : "text-emerald-700 font-semibold whitespace-pre-wrap")}>
               {line}
             </p>
           ))}
@@ -246,9 +246,9 @@ function TerminalInstance({
 
         {/* Active Input Line */}
         <form onSubmit={handleCommand} className="flex items-center gap-2 mt-2 relative z-10">
-          <span className={themeMode === "dark" ? "text-green-500 shrink-0 select-none" : "text-emerald-500/70 shrink-0 select-none"}>❯</span>
+          <span className={themeMode === "dark" ? "text-green-500 shrink-0 select-none" : "text-emerald-700 shrink-0 select-none font-bold"}>❯</span>
           <input
-            className={`bg-transparent border-none outline-none flex-1 placeholder-zinc-700 ${themeMode === "dark" ? "text-green-400 caret-green-500" : "text-zinc-800 caret-emerald-500"}`}
+            className={`bg-transparent border-none outline-none flex-1 placeholder-zinc-700 ${themeMode === "dark" ? "text-green-400 caret-green-500" : "text-zinc-950 font-medium caret-emerald-700"}`}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             spellCheck={false}

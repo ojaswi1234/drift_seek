@@ -112,7 +112,7 @@ export default function WallpaperModal({ isOpen, onCancel, onWallpaperUpdated }:
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800/60 bg-zinc-900/40">
           <div>
             <h2 className="text-sm font-mono text-zinc-200">Terminal Wallpapers</h2>
-            <p className="text-xs text-zinc-500 mt-1">Manage global backgrounds for the terminal</p>
+            <p className="text-xs text-zinc-500 mt-1">Manage your private terminal backgrounds</p>
           </div>
           <button onClick={onCancel} className="text-zinc-500 hover:text-zinc-300 transition-colors p-1">
             <X size={16} />
