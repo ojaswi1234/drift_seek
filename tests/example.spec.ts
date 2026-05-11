@@ -63,7 +63,7 @@ test.describe('Dashboard & Monitors (Authenticated)', () => {
         contentType: 'application/json',
         body: JSON.stringify({
           webservers: [
-            { _id: '1', url: 'https://example.com', name: 'Example Monitor', isUp: true }
+            { _id: '1', url: 'https://google.com', name: 'Google Monitor', isUp: true }
           ]
         }),
       });
@@ -75,7 +75,7 @@ test.describe('Dashboard & Monitors (Authenticated)', () => {
     // Monitors page data is fetched; verify mock data is rendered indirectly if exposed
     // Wait for the modal button or table element to be sure page loaded
     // Depending on your MonitorCard structure, this text would show up:
-    // await expect(page.locator('text=Example Monitor')).toBeVisible();
+    // await expect(page.locator('text=Google Monitor')).toBeVisible();
   });
 
   test('Check Status Functionality on console or dashboard', async ({ page }) => {

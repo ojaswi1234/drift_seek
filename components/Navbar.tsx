@@ -16,7 +16,7 @@ const Navbar = () => {
     { id: 'drift', icon: <Search size={24} strokeWidth={1.5} />, label: 'DRIFT_ENGINE', url: "#"},
     { id: 'console', icon: <Terminal size={24} strokeWidth={1.5} />, label: 'WEB_SHELL', url: "/console" },
     { id: 'jenkins', icon: <Bot size={24} strokeWidth={1.5} />, label: 'AUTO_FIXES', url: "/pipelines" },
-    { id: 'security', icon: <ShieldAlert size={24} strokeWidth={1.5} />, label: 'SECURITY', url: "/security" }, 
+    /* { id: 'security', icon: <ShieldAlert size={24} strokeWidth={1.5} />, label: 'SECURITY', url: "/security" },*/ 
   ];
 
   return (
