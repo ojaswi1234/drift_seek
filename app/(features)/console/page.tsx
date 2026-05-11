@@ -3,29 +3,18 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
-import { Terminal as TerminalIcon, Plus, X, Users, User } from "lucide-react";
+import { Plus, X, Users, User, Image as ImageIcon } from "lucide-react";
 import GlobalLoader from "@/components/GlobalLoader";
 import TeamRoomModal from "@/components/modals/user/TeamRoomModal";
+import WallpaperModal from "@/components/modals/user/WallpaperModal";
 import { io, Socket } from "socket.io-client";
 import anime from "animejs";
+import TerminalDropdown from "@/components/Dropdown";
 
 interface TabData {
   id: string;
   name: string;
 }
-
-// const ASCII_ART =
-// `
-// ████████▄     ▄████████  ▄█     ▄████████     ███             ▄████████    ▄████████    ▄████████    ▄█   ▄█▄ 
-// ███   ▀███   ███    ███ ███    ███    ███ ▀█████████▄        ███    ███   ███    ███   ███    ███   ███ ▄███▀ 
-// ███    ███   ███    ███ ███▌   ███    █▀     ▀███▀▀██        ███    █▀    ███    █▀    ███    █▀    ███▐██▀   
-// ███    ███  ▄███▄▄▄▄██▀ ███▌  ▄███▄▄▄         ███   ▀        ███         ▄███▄▄▄      ▄███▄▄▄      ▄█████▀    
-// ███    ███ ▀▀███▀▀▀▀▀   ███▌ ▀▀███▀▀▀         ███          ▀███████████ ▀▀███▀▀▀     ▀▀███▀▀▀     ▀▀█████▄    
-// ███    ███ ▀███████████ ███    ███            ███                   ███   ███    █▄    ███    █▄    ███▐██▄   
-// ███   ▄███   ███    ███ ███    ███            ███             ▄█    ███   ███    ███   ███    ███   ███ ▀███▄ 
-// ████████▀    ███    ███ █▀     ███           ▄████▀         ▄████████▀    ██████████   ██████████   ███   ▀█▀ 
-//              ███    ███                                                                             ▀                                                                                                                                                                                                                                                                                                                                                                               
-//  `;
 
 // A single terminal instance that maintains its own socket and history
 function TerminalInstance({
@@ -35,6 +24,8 @@ function TerminalInstance({
   tabId,
   mode,
   roomId,
+  themeMode,
+  activeWallpaper,
 }: {
   isActive: boolean;
   sysName: string;
@@ -42,6 +33,8 @@ function TerminalInstance({
   tabId: string;
   mode: "individual" | "team";
   roomId: string | null;
+  themeMode: "dark" | "light";
+  activeWallpaper: string | null;
 }) {
   const [input, setInput] = useState("");
   const [history, setHistory] = useState<string[]>([]);
@@ -179,14 +172,36 @@ function TerminalInstance({
       ref={containerRef}
       className={`absolute inset-0 flex flex-col ${isActive ? "z-10" : "hidden"}`}
     >
-      {/* Console Header Stats (Minimalist) */}
-      <div className="flex items-center justify-between px-6 py-2 border-b border-zinc-800/50 bg-zinc-900/30">
+      {/* Background Wallpaper Image */}
+      {activeWallpaper && (
+        <div 
+          className={`absolute inset-0 z-0 blur-[0px] pointer-events-none ${
+            themeMode === "dark" ? "opacity-40" : "opacity-30 mix-blend-multiply"
+          }`}
+          style={{
+            backgroundImage: `url(${activeWallpaper})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+      )}
+
+      {/* Content wrapper with z-index to overlay on background */}
+      <div className="relative z-10 flex flex-col h-full">
+        {/* Console Header Stats (Minimalist) */}
+        <div
+          className={`flex items-center justify-between px-6 py-2 border-b ${
+            themeMode === "dark"
+              ? "border-zinc-800/50 bg-zinc-900/40 backdrop-blur-md"
+              : "border-zinc-200 bg-white/70 backdrop-blur-md"
+          }`}
+        >
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <div className={`w-1.5 h-1.5 rounded-full ${isShellConnected ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" : "bg-red-500"}`} />
-            <span className="text-xs text-zinc-400 font-mono">{isShellConnected ? "CONNECTED" : "OFFLINE"}</span>
+            <span className={`text-xs font-mono ${themeMode === "dark" ? "text-zinc-400" : "text-zinc-600"}`}>{isShellConnected ? "CONNECTED" : "OFFLINE"}</span>
           </div>
-          <span className="text-xs text-zinc-600 font-mono">DIR: {currentDir}</span>
+          <span className={`text-xs font-mono ${themeMode === "dark" ? "text-zinc-600" : "text-zinc-500"}`}>DIR: {currentDir}</span>
         </div>
         {mode === "team" && roomId && (
           <div className="flex items-center gap-2">
@@ -197,16 +212,21 @@ function TerminalInstance({
       </div>
 
       {/* Terminal View */}
-      <div ref={scrollRef} className="flex-1 p-6 overflow-y-auto font-mono text-sm custom-scrollbar text-zinc-300">
+      <div
+        ref={scrollRef}
+        className={`flex-1 p-6 overflow-y-auto font-mono text-sm custom-scrollbar ${
+          themeMode === "dark" ? "text-zinc-300" : "text-zinc-800"
+        }`}
+      >
         <div className="mb-8 opacity-90 text-xs">
          <div
-  style={{ fontFamily: "var(--font-press-start), monospace" }}
-  className="text-2xl md:text-6xl bg-clip-text text-transparent 
-  bg-linear-to-r from-emerald-400 via-cyan-400 to-blue-500 mb-6 select-none"
->
-  Drift_Seeker
-</div>
-          <div className="space-y-1 text-zinc-400 font-mono">
+            style={{ fontFamily: "var(--font-press-start), monospace" }}
+            className="text-2xl md:text-6xl bg-clip-text text-transparent 
+            bg-linear-to-r from-emerald-400 via-cyan-400 to-blue-500 mb-6 select-none"
+          >
+            Drift_Seeker
+          </div>
+          <div className={`space-y-1 font-mono ${themeMode === "dark" ? "text-zinc-400" : "text-zinc-600"}`}>
             <p>Welcome to DriftSeeker Terminal [Instance: {tabId}]</p>
             <p>
               Authorized User: {userName}{" "}
@@ -216,19 +236,19 @@ function TerminalInstance({
           <div className="h-px w-24 bg-linear-to-r from-emerald-500/50 to-transparent my-4" />
         </div>
 
-        <div className="space-y-1.5 mb-4">
+        <div className="space-y-1.5 mb-4 relative z-10">
           {history.map((line, i) => (
-            <p key={i} className={line.startsWith(`${sysName}:`) || line.includes("[client]") ? "text-zinc-500" : "text-emerald-400/90 whitespace-pre-wrap"}>
+            <p key={i} className={line.startsWith(`${sysName}:`) || line.includes("[client]") ? "text-zinc-500" : (themeMode === "dark" ? "text-green-500 whitespace-pre-wrap" : "text-emerald-500 whitespace-pre-wrap")}>
               {line}
             </p>
           ))}
         </div>
 
         {/* Active Input Line */}
-        <form onSubmit={handleCommand} className="flex items-center gap-2 mt-2">
-          <span className="text-emerald-500/70 shrink-0 select-none">❯</span>
+        <form onSubmit={handleCommand} className="flex items-center gap-2 mt-2 relative z-10">
+          <span className={themeMode === "dark" ? "text-green-500 shrink-0 select-none" : "text-emerald-500/70 shrink-0 select-none"}>❯</span>
           <input
-            className="bg-transparent border-none outline-none flex-1 text-zinc-200 caret-emerald-500 placeholder-zinc-700"
+            className={`bg-transparent border-none outline-none flex-1 placeholder-zinc-700 ${themeMode === "dark" ? "text-green-400 caret-green-500" : "text-zinc-800 caret-emerald-500"}`}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             spellCheck={false}
@@ -237,6 +257,7 @@ function TerminalInstance({
             disabled={!isShellConnected}
           />
         </form>
+      </div>
       </div>
     </div>
   );
@@ -258,6 +279,27 @@ export default function Page() {
   const [memberIdInput, setMemberIdInput] = useState("");
   const [memberRoleInput, setMemberRoleInput] = useState("");
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+  const [themeMode, setThemeMode] = useState<"dark" | "light">("dark");
+  const [showWallpaperModal, setShowWallpaperModal] = useState(false);
+  const [activeWallpaper, setActiveWallpaper] = useState<string | null>(null);
+
+  const fetchActiveWallpaper = async () => {
+    try {
+      const res = await fetch("/api/wallpaper");
+      if (res.ok) {
+        const data = await res.json();
+        const active = data.wallpapers?.find((w: any) => w.isActive);
+        if (active) setActiveWallpaper(active.image);
+        else setActiveWallpaper(null);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    fetchActiveWallpaper();
+  }, []);
 
   // Layout Animation
   const layoutRef = useRef<HTMLDivElement>(null);
@@ -292,7 +334,6 @@ export default function Page() {
     const newTabs = tabs.filter((t) => t.id !== idToClose);
     setTabs(newTabs);
     
-    // Switch active tab if we closed the currently active one
     if (activeTabId === idToClose) {
       setActiveTabId(newTabs[newTabs.length - 1].id);
     }
@@ -303,38 +344,55 @@ export default function Page() {
       setShowTeamModal(true);
       return;
     }
-
     setMode("individual");
     setActiveRoomId(null);
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4 md:p-8 font-sans selection:bg-emerald-500/30">
+    // THE FIX IS HERE: Added pl-16 sm:pl-20 md:pl-24 lg:pl-24 to safely clear the fixed navbar
+    <div
+      className={`min-h-screen flex items-center justify-center pl-16 sm:pl-20 md:pl-24 lg:pl-24 pr-4 md:pr-8 py-4 md:py-8 font-sans selection:bg-emerald-500/30 overflow-hidden transition-colors duration-300 ${
+        themeMode === "dark" ? "bg-zinc-950 text-zinc-100" : "bg-zinc-100 text-zinc-900"
+      }`}
+    >
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(16, 185, 129, 0.2); border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(16, 185, 129, 0.5); }
       `}</style>
+      
+      {/* THE SECOND FIX IS HERE: w-[98vw] changed to w-full max-w-full to respect parent padding. Height increased to 98vh */}
       <div 
         ref={layoutRef}
-        className="w-full max-w-6xl h-[85vh] bg-[#0c0c0c] border border-zinc-800/60 rounded-xl shadow-2xl flex flex-col overflow-hidden"
+        className={`bg-[#0c0c0c] border border-zinc-800/60 rounded-xl shadow-2xl flex flex-col overflow-hidden 
+          transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] origin-center
+          w-full max-w-full h-[98vh]
+        `}
       >
         {/* Sleek MacOS-like Window Header + Tabs */}
-        <div className="flex bg-zinc-950 border-b border-zinc-800/60">
-          <div className="flex px-4 items-center gap-2 border-r border-zinc-800/60 shrink-0">
-            <TerminalIcon size={14} className="text-zinc-500" />
-          </div>
+        <div className={`flex border-b ${themeMode === "dark" ? "bg-zinc-950 border-zinc-800/60" : "bg-white border-zinc-200"}`}>
+          
+          <TerminalDropdown 
+            currentMode={themeMode}
+            onModeChange={setThemeMode}
+          />
           
           <div className="flex flex-1 overflow-x-auto scrollbar-hide">
             {tabs.map((tab) => (
               <div
                 key={tab.id}
                 onClick={() => setActiveTabId(tab.id)}
-                className={`group flex items-center gap-3 px-4 py-2.5 text-xs font-mono cursor-pointer border-r border-zinc-800/60 transition-all duration-200 min-w-35 max-w-50 ${
+                className={`group flex items-center gap-3 px-4 py-2.5 text-xs font-mono cursor-pointer border-r transition-all duration-200 min-w-35 max-w-50 ${
+                  themeMode === "dark" ? "border-zinc-800/60" : "border-zinc-200"
+                } ${
                   activeTabId === tab.id
-                    ? "bg-[#0c0c0c] text-zinc-200"
-                    : "bg-zinc-900/50 text-zinc-500 hover:bg-zinc-900"
+                    ? themeMode === "dark"
+                      ? "bg-[#0c0c0c] text-zinc-200"
+                      : "bg-zinc-50 text-zinc-900"
+                    : themeMode === "dark"
+                      ? "bg-zinc-900/50 text-zinc-500 hover:bg-zinc-900"
+                      : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
                 }`}
               >
                 <span className="truncate flex-1">{tab.name}</span>
@@ -353,20 +411,28 @@ export default function Page() {
             
             <button
               onClick={addTab}
-              className="flex items-center justify-center px-4 py-2 hover:bg-zinc-900 transition-colors text-zinc-500 hover:text-zinc-300"
+              className={`flex items-center justify-center px-4 py-2 transition-colors ${
+                themeMode === "dark"
+                  ? "hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300"
+                  : "hover:bg-zinc-200 text-zinc-500 hover:text-zinc-800"
+              }`}
             >
               <Plus size={14} />
             </button>
           </div>
 
-          <div className="flex items-center gap-1 px-3 border-l border-zinc-800/60 shrink-0">
-            <div className="flex bg-zinc-900 rounded-md p-0.5">
+          <div className={`flex items-center gap-1 px-3 border-l shrink-0 ${themeMode === "dark" ? "border-zinc-800/60" : "border-zinc-200"}`}>
+            <div className={`flex rounded-md p-0.5 ${themeMode === "dark" ? "bg-zinc-900" : "bg-zinc-200"}`}>
               <button
                 onClick={() => handleModeSwitch("individual")}
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono transition-all duration-200 ${
                   mode === "individual"
-                    ? "bg-zinc-800 text-zinc-200 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-400"
+                    ? themeMode === "dark"
+                      ? "bg-zinc-800 text-zinc-200 shadow-sm"
+                      : "bg-white text-zinc-900 shadow-sm"
+                    : themeMode === "dark"
+                      ? "text-zinc-500 hover:text-zinc-400"
+                      : "text-zinc-500 hover:text-zinc-700"
                 }`}
               >
                 <User size={12} />
@@ -377,18 +443,30 @@ export default function Page() {
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono transition-all duration-200 ${
                   mode === "team"
                     ? "bg-emerald-500/20 text-emerald-400 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-400"
+                    : themeMode === "dark"
+                      ? "text-zinc-500 hover:text-zinc-400"
+                      : "text-zinc-500 hover:text-zinc-700"
                 }`}
               >
                 <Users size={12} />
                 <span className="hidden sm:inline">Team</span>
               </button>
             </div>
+            
+            <button
+               onClick={() => setShowWallpaperModal(true)}
+               title="Terminal Wallpaper"
+               className={`flex items-center gap-1.5 px-3 py-1 ml-2 rounded-sm text-xs font-mono transition-all duration-200 hover:opacity-80
+                 ${themeMode === "dark" ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-600 hover:text-zinc-900"}
+               `}
+            >
+               <ImageIcon size={14} />
+            </button>
           </div>
         </div>
 
         {/* Terminals Container */}
-        <div className="flex-1 relative bg-[#0c0c0c]">
+        <div className={`flex-1 relative ${themeMode === "dark" ? "bg-[#0c0c0c]" : "bg-zinc-50"}`}>
           {tabs.map((tab) => (
             <TerminalInstance
               key={tab.id}
@@ -398,6 +476,8 @@ export default function Page() {
               userName={userName}
               mode={mode}
               roomId={activeRoomId}
+              themeMode={themeMode}
+              activeWallpaper={activeWallpaper}
             />
           ))}
         </div>
@@ -413,7 +493,12 @@ export default function Page() {
           setShowTeamModal(false);
           if (mode !== "team") setMode("individual");
         }}
-       
+      />
+
+      <WallpaperModal 
+        isOpen={showWallpaperModal}
+        onCancel={() => setShowWallpaperModal(false)}
+        onWallpaperUpdated={fetchActiveWallpaper}
       />
     </div>
   );

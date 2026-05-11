@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@cfworker/json-schema": "^4.1.1",
+    "@genkit-ai/googleai": "^1.28.0",
     "@genkit-ai/mcp": "^1.33.0",
     "@tailwindcss/oxide-linux-x64-gnu": "^4.2.2",
     "@types/animejs": "^3.1.13",
