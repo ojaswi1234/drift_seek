@@ -13,6 +13,9 @@ on:
       candidate_branch:
         description: 'Candidate branch (Branch B)'
         required: true
+      seek_api_url:
+        description: 'Seek Dashboard API URL (e.g., https://your-domain.com)'
+        required: true
       test_url:
         description: 'The URL to test (e.g., http://localhost:3000)'
         required: true
@@ -110,4 +113,6 @@ jobs:
           path: tools
 
       - name: Evaluate A/B Test Gates
-        run: node tools/scripts/ab-platform/evaluate.js ./baseline-results.json ./candidate-results.json
+        env:
+          SEEK_API_TOKEN: ${{ secrets.SEEK_API_TOKEN }}
+        run: node tools/scripts/ab-platform/evaluate.js ./baseline-results.json ./candidate-results.json "${{ github.event.inputs.seek_api_url }}/api/abtest/results" "https://github.com/${{ github.event.inputs.target_repo }}" "${{ github.event.inputs.baseline_branch }}" "${{ github.event.inputs.candidate_branch }}"

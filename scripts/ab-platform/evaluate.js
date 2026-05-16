@@ -1,11 +1,17 @@
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
+const http = require('http');
 
 const baselinePath = process.argv[2];
 const candidatePath = process.argv[3];
+const apiUrl = process.argv[4];
+const githubUrl = process.argv[5];
+const baselineBranch = process.argv[6] || 'main';
+const candidateBranch = process.argv[7] || 'candidate';
 
 if (!baselinePath || !candidatePath) {
-    console.error("Usage: node evaluate.js <baseline-results.json> <candidate-results.json>");
+    console.error("Usage: node evaluate.js <baseline-results.json> <candidate-results.json> [apiUrl] [githubUrl] [baselineBranch] [candidateBranch]");
     process.exit(1);
 }
 
@@ -78,10 +84,79 @@ if (candidateMetrics.rps >= minTargetRPS) {
 
 console.log(`\n==============================================================\n`);
 
-if (failed) {
-    console.error("⛔ OVERALL RESULT: REJECT CANDIDATE \n");
-    process.exit(1);
-} else {
-    console.log("🟢 OVERALL RESULT: ACCEPT CANDIDATE (PERFORMANCE WIN) \n");
-    process.exit(0);
-}
+const payload = JSON.stringify({
+    githubUrl: githubUrl || "Unknown",
+    testData: {
+        baselineBranch,
+        candidateBranch,
+        baselineMetrics: {
+            requestsPerSecond: baselineMetrics.rps,
+            latencyAverage: baselineMetrics.avgLatency,
+            latency99th: baselineMetrics.p99Latency,
+            successRate: baselineMetrics.successRate
+        },
+        candidateMetrics: {
+            requestsPerSecond: candidateMetrics.rps,
+            latencyAverage: candidateMetrics.avgLatency,
+            latency99th: candidateMetrics.p99Latency,
+            successRate: candidateMetrics.successRate
+        },
+        passed: !failed
+    }
+});
+
+const sendResults = () => {
+    return new Promise((resolve, reject) => {
+        if (!apiUrl) {
+            console.log("No API URL provided, skipping reporting results.");
+            resolve();
+            return;
+        }
+
+        const url = new URL(apiUrl);
+                const options = {
+                    hostname: url.hostname,
+                    port: url.port,
+                    path: url.pathname,
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(payload)
+                    }
+                };
+
+                // Attach API token header if present in environment
+                const apiToken = process.env.SEEK_API_TOKEN || '';
+                if (apiToken) {
+                    options.headers['x-seek-api-token'] = apiToken;
+                }
+
+        const client = url.protocol === 'https:' ? https : http;
+        const reqPost = client.request(options, (resPost) => {
+            let data = '';
+            resPost.on('data', (chunk) => { data += chunk; });
+            resPost.on('end', () => {
+                console.log(`Report sent, status code: ${resPost.statusCode}`);
+                resolve(data);
+            });
+        });
+
+        reqPost.on('error', (e) => {
+            console.error(e);
+            reject(e);
+        });
+
+        reqPost.write(payload);
+        reqPost.end();
+    });
+};
+
+sendResults().catch(err => console.error("Could not send results:", err)).finally(() => {
+    if (failed) {
+        console.error("⛔ OVERALL RESULT: REJECT CANDIDATE \n");
+        process.exit(1);
+    } else {
+        console.log("🟢 OVERALL RESULT: ACCEPT CANDIDATE (PERFORMANCE WIN) \n");
+        process.exit(0);
+    }
+});
