@@ -20,11 +20,11 @@ on:
       start_command:
         description: 'Command to start the server (e.g. npm start)'
         required: true
-        default: 'npm start'
+        default: 'serve dist -p 3000'
       build_command:
         description: 'Command to build the server (e.g. npm run build)'
         required: false
-        default: 'npm install --legacy-peer-deps && npm run build --if-present'
+        default: 'npm install --legacy-peer-deps && npm run build --if-present && npm install -g serve'
 
 jobs:
   ab-performance-test:
