@@ -24,7 +24,7 @@ on:
       build_command:
         description: 'Command to build the server (e.g. npm run build)'
         required: false
-        default: 'npm install && npm run build'
+        default: 'npm install --legacy-peer-deps && npm run build --if-present'
 
 jobs:
   ab-performance-test:
@@ -48,7 +48,7 @@ jobs:
       - name: Setup Node for Baseline
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Build Baseline
         working-directory: ./baseline
