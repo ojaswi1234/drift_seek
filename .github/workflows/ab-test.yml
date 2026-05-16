@@ -24,7 +24,7 @@ on:
       build_command:
         description: 'Command to build the server (e.g. npm run build)'
         required: false
-        default: 'npm ci && npm run build'
+        default: 'npm install && npm run build'
 
 jobs:
   ab-performance-test:
