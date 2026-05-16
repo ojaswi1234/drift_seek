@@ -43,16 +43,18 @@ function startServer() {
       const hostRepoPath = path.join(REPOS_BASE_DIR, repoName);
       const command = "docker";
 
-      const args = [
-        "run", "--rm", "-it", "--name", containerName, "--memory", "256m", "--cpus", "0.5",
-        "-v", `${hostRepoPath}:/projects`, 
-        "-w", "/projects",
-        "-e", "TERM=xterm-256color",
-        "-e", `PS1=DRIFT_SERVER_PROMPT|\\w> `,
-        "-e", "PROMPT_COMMAND=",
-        targetContainer, 
-        "sh"
-      ];
+     const args = [
+  "run", "--rm", "-it", "--name", containerName, "--memory", "256m", "--cpus", "0.5",
+  "-v", `${hostRepoPath}:/projects`,
+  "-w", "/projects",
+  "-e", "TERM=xterm-256color",
+  "-e", `PS1=DRIFT_SERVER_PROMPT|\\w> `,
+  "-e", "PROMPT_COMMAND=",  
+  targetContainer, 
+  "sh", 
+  "-c", 
+  "apk update && apk add --no-cache bash git openrc nano docker kubectl curl && clear && exec bash"
+];
       console.log(`Secure Shell Session Started for: ${customUser}`);
       ptyProcess = pty.spawn(command, args, {
         name: "xterm-color",
