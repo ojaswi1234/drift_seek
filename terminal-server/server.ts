@@ -48,12 +48,11 @@ function startServer() {
   "-v", `${hostRepoPath}:/projects`,
   "-w", "/projects",
   "-e", "TERM=xterm-256color",
-  "-e", `PS1=DRIFT_SERVER_PROMPT|\\w> `,
   "-e", "PROMPT_COMMAND=",  
   targetContainer, 
   "sh", 
   "-c", 
-  "apk update && apk add --no-cache bash git openrc nano docker kubectl curl && clear && exec bash"
+  "apk update && apk add --no-cache bash git openrc curl && clear && exec bash"
 ];
       console.log(`Secure Shell Session Started for: ${customUser}`);
       ptyProcess = pty.spawn(command, args, {
