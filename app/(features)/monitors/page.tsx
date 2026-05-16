@@ -71,15 +71,15 @@ export default function Page() {
       .finally(() => setIsLoading(false));
   };
 
-  // --- NEW: FETCH STRESS TEST RESULTS ---
+  // --- NEW: FETCH AB TEST RESULTS ---
   const fetchContainerResults = () => {
-    fetch("/api/pipelines/results") // Ensure this API endpoint exists to fetch from StressTestLogs
-      .then(res => res.json())
+    fetch("/api/abtest/results") // Fetch from ABTestLogs
+      .then((res) => res.json())
       .then((data) => {
-        if (data.success && Array.isArray(data.results)) {
+        if (data.success && Array.isArray(data.data)) {
           // Flatten the nested results if your schema is repo-based
-          const flattened = data.results.flatMap((repo: any) => 
-            (repo.stressTests || []).map((test: any) => ({
+          const flattened = data.data.flatMap((repo: any) => 
+            (repo.abTests || []).map((test: any) => ({
               githubUrl: repo.githubUrl,
               metrics: test,
               testedAt: test.testedAt
@@ -89,7 +89,7 @@ export default function Page() {
           setContainer(flattened);
         }
       })
-      .catch((err) => console.error("Error fetching stress logs:", err));
+      .catch((err) => console.error("Error fetching AB test logs:", err));
   };
 
   React.useEffect(() => {
@@ -181,7 +181,7 @@ export default function Page() {
     }
   };
 
-  const handleRunStressTest = async (githubUrl: string) => {
+  const handleRunStressTest = async (githubUrl: string, branches?: string[]) => {
     setIsEngineRunning(true);
     setEngineTarget(githubUrl);
     setEngineError(null);
@@ -190,10 +190,14 @@ export default function Page() {
     let stressTestTimeoutId: NodeJS.Timeout | null = null;
     
     try {
-      const res = await fetch('/api/pipelines/trigger', {
+      if (!branches || branches.length !== 2) {
+        throw new Error('Please select exactly 2 branches for the A/B performance test.');
+      }
+
+      const res = await fetch('/api/abtest/trigger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ githubUrl }),
+        body: JSON.stringify({ githubUrl, branches }),
       });
 
       const data = await res.json();
@@ -350,7 +354,7 @@ export default function Page() {
         onClose={() => setIsGithubModalOpen(false)} 
         repos={repos}
         isLoading={isFetchingRepos}
-        onSelectRepo={(url) => handleRunStressTest(url)} 
+        onSelectRepo={(url, branches) => handleRunStressTest(url, branches)} 
       />
       
       <WebserverMonitorModal 
@@ -368,10 +372,10 @@ export default function Page() {
 // Sub-component to render the pipeline results cleanly in the light theme
 function ContainerMetricCard({ data }: { data: any }) {
   const { metrics, githubUrl, testedAt } = data;
-  const isHealthy = metrics.successRate > 95;
+  const isHealthy = metrics.passed !== false;
 
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 shadow-sm font-sans relative overflow-hidden">
+    <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 shadow-sm font-sans relative overflow-hidden mb-4">
       <div className={`absolute top-0 left-0 w-1.5 h-full ${isHealthy ? 'bg-emerald-500' : 'bg-red-500'}`} />
       
       <div className="pl-3">
@@ -387,23 +391,22 @@ function ContainerMetricCard({ data }: { data: any }) {
           </span>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Activity size={12}/> Success</div>
-            <div className={`font-bold ${isHealthy ? 'text-emerald-600' : 'text-red-600'}`}>{Number(metrics.successRate || 0).toFixed(1)}%</div>
-          </div>
-          <div>
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Zap size={12}/> Req/Sec</div>
-            <div className="font-bold text-gray-900">{Number(metrics.requestsPerSecond || 0).toFixed(1)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Clock size={12}/> Avg ms</div>
-            <div className="font-bold text-gray-900">{Math.round(metrics.latencyAverage || 0)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Terminal size={12}/> p99 ms</div>
-            <div className="font-bold text-gray-900">{Math.round(metrics.latency99th || metrics.latency95th || 0)}</div>
-          </div>
+        <p className="text-sm font-bold text-gray-600 mb-3">Branches Mapped: <span className="text-black">{metrics.baselineBranch}</span> vs <span className="text-black">{metrics.candidateBranch}</span></p>
+
+        <div className="grid grid-cols-2 bg-white rounded border border-gray-200 p-3 mb-3 shadow-inner">
+           <div>
+              <span className="text-xs text-gray-500 uppercase tracking-wider font-bold">Baseline</span>
+              <div className="text-sm mt-1">RPS: <span className="font-mono font-bold text-black">{Number(metrics.baselineMetrics?.requestsPerSecond || 0).toFixed(1)}</span></div>
+              <div className="text-sm text-gray-600">p99: <span className="font-mono">{metrics.baselineMetrics?.latency99th}ms</span></div>
+           </div>
+           <div>
+              <span className="text-xs text-gray-500 uppercase tracking-wider font-bold">Candidate</span>
+              <div className="text-sm mt-1">RPS: <span className="font-mono font-bold text-black">{Number(metrics.candidateMetrics?.requestsPerSecond || 0).toFixed(1)}</span></div>
+              <div className="text-sm text-gray-600">p99: <span className="font-mono">{metrics.candidateMetrics?.latency99th}ms</span></div>
+           </div>
+        </div>
+        <div className={`text-xs py-1.5 px-3 rounded-md uppercase tracking-wider font-bold inline-flex items-center gap-2 ${isHealthy ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+          {isHealthy ? "Performance Win 🏆" : "Degradation limit reached ❌"}
         </div>
       </div>
     </div>

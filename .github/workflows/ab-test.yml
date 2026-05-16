@@ -1,0 +1,113 @@
+name: Sequential A/B Performance Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_repo:
+        description: 'Target Repository (e.g., owner/repo)'
+        required: true
+      baseline_branch:
+        description: 'Baseline branch (Branch A)'
+        required: true
+        default: 'main'
+      candidate_branch:
+        description: 'Candidate branch (Branch B)'
+        required: true
+      test_url:
+        description: 'The URL to test (e.g., http://localhost:3000)'
+        required: true
+        default: 'http://localhost:3000'
+      start_command:
+        description: 'Command to start the server (e.g. npm start)'
+        required: true
+        default: 'npm start'
+      build_command:
+        description: 'Command to build the server (e.g. npm run build)'
+        required: false
+        default: 'npm ci && npm run build'
+
+jobs:
+  ab-performance-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: System Setup
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl
+          npm install -g autocannon wait-on
+
+      # ================== BASELINE (BRANCH A) ==================
+      - name: Checkout Baseline Branch (A)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.target_repo }}
+          ref: ${{ github.event.inputs.baseline_branch }}
+          path: baseline
+
+      - name: Setup Node for Baseline
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build Baseline
+        working-directory: ./baseline
+        run: ${{ github.event.inputs.build_command }}
+
+      - name: Start Baseline Server
+        working-directory: ./baseline
+        run: |
+          ${{ github.event.inputs.start_command }} &
+          echo $! > server.pid
+          wait-on ${{ github.event.inputs.test_url }} -t 60000
+
+      - name: Load Test Baseline (A)
+        run: |
+          echo "Running warm-up..."
+          autocannon -c 10 -d 5 ${{ github.event.inputs.test_url }}
+          echo "Running Baseline Load Test..."
+          autocannon -c 100 -d 30 -j ${{ github.event.inputs.test_url }} > baseline-results.json
+        
+      - name: Stop Baseline Server
+        working-directory: ./baseline
+        run: kill -9 $(cat server.pid) || true
+
+      # ================== CANDIDATE (BRANCH B) ==================
+      - name: Checkout Candidate Branch (B)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.target_repo }}
+          ref: ${{ github.event.inputs.candidate_branch }}
+          path: candidate
+
+      - name: Build Candidate
+        working-directory: ./candidate
+        run: ${{ github.event.inputs.build_command }}
+
+      - name: Start Candidate Server
+        working-directory: ./candidate
+        run: |
+          ${{ github.event.inputs.start_command }} &
+          echo $! > server.pid
+          wait-on ${{ github.event.inputs.test_url }} -t 60000
+
+      - name: Load Test Candidate (B)
+        run: |
+          echo "Running warm-up..."
+          autocannon -c 10 -d 5 ${{ github.event.inputs.test_url }}
+          echo "Running Candidate Load Test..."
+          autocannon -c 100 -d 30 -j ${{ github.event.inputs.test_url }} > candidate-results.json
+        
+      - name: Stop Candidate Server
+        working-directory: ./candidate
+        run: kill -9 $(cat server.pid) || true
+
+      # ================== EVALUATION ==================
+      - name: Checkout Evaluation Script
+        uses: actions/checkout@v4
+        with:
+          repository: 'ojaswi1234/drift_seek'
+          path: tools
+
+      - name: Evaluate A/B Test Gates
+        run: node tools/scripts/ab-platform/evaluate.js ./baseline-results.json ./candidate-results.json
