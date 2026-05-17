@@ -38,7 +38,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y jq curl
-          npm install -g autocannon wait-on
+          npm install -g autocannon wait-on kill-port
 
       # ================== BASELINE (BRANCH A) ==================
       - name: Checkout Baseline Branch (A)
@@ -55,26 +55,55 @@ jobs:
 
       - name: Build Baseline
         working-directory: ./baseline
-        run: ${{ github.event.inputs.build_command }}
+        run: |
+          if [ -d "server" ] && [ -d "client" ]; then
+            echo "==> MERN Stack Detected (server/client) <=="
+            (cd server && npm install --legacy-peer-deps)
+            (cd client && npm install --legacy-peer-deps && npm run build --if-present)
+          elif [ -d "backend" ] && [ -d "frontend" ]; then
+            echo "==> MERN Stack Detected (backend/frontend) <=="
+            (cd backend && npm install --legacy-peer-deps)
+            (cd frontend && npm install --legacy-peer-deps && npm run build --if-present)
+          else
+            echo "==> Single-Process App Detected <=="
+            ${{ github.event.inputs.build_command }}
+          fi
 
       - name: Start Baseline Server
         working-directory: ./baseline
         run: |
-          TEST_PORT=$(echo "${{ github.event.inputs.test_url }}" | sed -E 's#.*:([0-9]+).*#\1#')
-          npx kill-port "$TEST_PORT" || true
-          ${{ github.event.inputs.start_command }} &
-          wait-on ${{ github.event.inputs.test_url }} -t 60000
+          if [ -d "server" ] && [ -d "client" ]; then
+            npx kill-port 3000 5000 || true
+            (cd server && npm start) &
+            (cd client && npm start) &
+            wait-on http://localhost:3000 http://localhost:5000 -t 90000
+            echo "TARGET_TEST_URL=http://localhost:5000" >> $GITHUB_ENV
+            echo "TARGET_PORTS=3000 5000" >> $GITHUB_ENV
+          elif [ -d "backend" ] && [ -d "frontend" ]; then
+            npx kill-port 3000 5000 || true
+            (cd backend && npm start) &
+            (cd frontend && npm start) &
+            wait-on http://localhost:3000 http://localhost:5000 -t 90000
+            echo "TARGET_TEST_URL=http://localhost:5000" >> $GITHUB_ENV
+            echo "TARGET_PORTS=3000 5000" >> $GITHUB_ENV
+          else
+            TEST_PORT=$(echo "${{ github.event.inputs.test_url }}" | sed -E 's#.*:([0-9]+).*#\1#')
+            npx kill-port "$TEST_PORT" || true
+            ${{ github.event.inputs.start_command }} &
+            wait-on ${{ github.event.inputs.test_url }} -t 60000
+            echo "TARGET_TEST_URL=${{ github.event.inputs.test_url }}" >> $GITHUB_ENV
+            echo "TARGET_PORTS=$TEST_PORT" >> $GITHUB_ENV
+          fi
 
       - name: Load Test Baseline (A)
         run: |
-          autocannon -c 10 -d 5 ${{ github.event.inputs.test_url }}
-          autocannon -c 100 -d 30 -j ${{ github.event.inputs.test_url }} > baseline-results.json
+          echo "Running warm-up on $TARGET_TEST_URL..."
+          autocannon -c 10 -d 5 $TARGET_TEST_URL
+          echo "Running Baseline Load Test..."
+          autocannon -c 100 -d 30 -j $TARGET_TEST_URL > baseline-results.json
         
       - name: Stop Baseline Server
-        working-directory: ./baseline
-        run: |
-          TEST_PORT=$(echo "${{ github.event.inputs.test_url }}" | sed -E 's#.*:([0-9]+).*#\1#')
-          npx kill-port "$TEST_PORT" || true
+        run: npx kill-port $TARGET_PORTS || true
 
       # ================== CANDIDATE (BRANCH B) ==================
       - name: Checkout Candidate Branch (B)
@@ -86,26 +115,55 @@ jobs:
 
       - name: Build Candidate
         working-directory: ./candidate
-        run: ${{ github.event.inputs.build_command }}
+        run: |
+          if [ -d "server" ] && [ -d "client" ]; then
+            echo "==> MERN Stack Detected (server/client) <=="
+            (cd server && npm install --legacy-peer-deps)
+            (cd client && npm install --legacy-peer-deps && npm run build --if-present)
+          elif [ -d "backend" ] && [ -d "frontend" ]; then
+            echo "==> MERN Stack Detected (backend/frontend) <=="
+            (cd backend && npm install --legacy-peer-deps)
+            (cd frontend && npm install --legacy-peer-deps && npm run build --if-present)
+          else
+            echo "==> Single-Process App Detected <=="
+            ${{ github.event.inputs.build_command }}
+          fi
 
       - name: Start Candidate Server
         working-directory: ./candidate
         run: |
-          TEST_PORT=$(echo "${{ github.event.inputs.test_url }}" | sed -E 's#.*:([0-9]+).*#\1#')
-          npx kill-port "$TEST_PORT" || true
-          ${{ github.event.inputs.start_command }} &
-          wait-on ${{ github.event.inputs.test_url }} -t 60000
+          if [ -d "server" ] && [ -d "client" ]; then
+            npx kill-port 3000 5000 || true
+            (cd server && npm start) &
+            (cd client && npm start) &
+            wait-on http://localhost:3000 http://localhost:5000 -t 90000
+            echo "TARGET_TEST_URL=http://localhost:5000" >> $GITHUB_ENV
+            echo "TARGET_PORTS=3000 5000" >> $GITHUB_ENV
+          elif [ -d "backend" ] && [ -d "frontend" ]; then
+            npx kill-port 3000 5000 || true
+            (cd backend && npm start) &
+            (cd frontend && npm start) &
+            wait-on http://localhost:3000 http://localhost:5000 -t 90000
+            echo "TARGET_TEST_URL=http://localhost:5000" >> $GITHUB_ENV
+            echo "TARGET_PORTS=3000 5000" >> $GITHUB_ENV
+          else
+            TEST_PORT=$(echo "${{ github.event.inputs.test_url }}" | sed -E 's#.*:([0-9]+).*#\1#')
+            npx kill-port "$TEST_PORT" || true
+            ${{ github.event.inputs.start_command }} &
+            wait-on ${{ github.event.inputs.test_url }} -t 60000
+            echo "TARGET_TEST_URL=${{ github.event.inputs.test_url }}" >> $GITHUB_ENV
+            echo "TARGET_PORTS=$TEST_PORT" >> $GITHUB_ENV
+          fi
 
       - name: Load Test Candidate (B)
         run: |
-          autocannon -c 10 -d 5 ${{ github.event.inputs.test_url }}
-          autocannon -c 100 -d 30 -j ${{ github.event.inputs.test_url }} > candidate-results.json
+          echo "Running warm-up on $TARGET_TEST_URL..."
+          autocannon -c 10 -d 5 $TARGET_TEST_URL
+          echo "Running Candidate Load Test..."
+          autocannon -c 100 -d 30 -j $TARGET_TEST_URL > candidate-results.json
         
       - name: Stop Candidate Server
-        working-directory: ./candidate
-        run: |
-          TEST_PORT=$(echo "${{ github.event.inputs.test_url }}" | sed -E 's#.*:([0-9]+).*#\1#')
-          npx kill-port "$TEST_PORT" || true
+        run: npx kill-port $TARGET_PORTS || true
 
       # ================== EVALUATION ==================
       - name: Checkout Evaluation Script

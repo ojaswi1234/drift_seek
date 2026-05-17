@@ -362,7 +362,7 @@ export default function Page() {
         <aside className="w-full lg:w-1/2 flex flex-col h-full min-h-0">
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-3">
-              <h2 className="font-bold text-lg text-gray-800 tracking-wide uppercase">Stress Reports</h2>
+              <h2 className="font-bold text-lg text-gray-800 tracking-wide uppercase">A/B Test Reports</h2>
               <button 
                 onClick={fetchContainerResults}
                 className="p-1.5 text-gray-400 hover:text-black hover:bg-gray-100 rounded-full transition-colors"
