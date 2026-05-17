@@ -13,8 +13,7 @@ export async function POST(req: NextRequest) {
     const githubToken =
       process.env.GITHUB_ACTION_TRIGGER_TOKEN ||
       process.env.GITHUB_TOKEN ||
-      process.env.GH_PAT ||
-      (session as any).accessToken;
+      process.env.GH_PAT;
 
     if (!githubToken) {
       return NextResponse.json(
@@ -66,7 +65,7 @@ export async function POST(req: NextRequest) {
         {
           success: false,
           error:
-            "Failed to trigger the central A/B workflow. Ensure ab-test.yml exists in the default branch of ojaswi1234/drift_seek and the trigger token has workflow permissions.",
+            "Failed to trigger the central A/B workflow. Verify GITHUB_ACTION_TRIGGER_TOKEN (or GITHUB_TOKEN/GH_PAT) is configured with workflow permissions and that ab-test.yml exists on the default branch of ojaswi1234/drift_seek.",
         },
         { status: dispatchResponse.status }
       );
