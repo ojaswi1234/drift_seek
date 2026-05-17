@@ -60,20 +60,21 @@ jobs:
       - name: Start Baseline Server
         working-directory: ./baseline
         run: |
+          TEST_PORT=$(echo "${{ github.event.inputs.test_url }}" | sed -E 's#.*:([0-9]+).*#\1#')
+          npx kill-port "$TEST_PORT" || true
           ${{ github.event.inputs.start_command }} &
-          echo $! > server.pid
           wait-on ${{ github.event.inputs.test_url }} -t 60000
 
       - name: Load Test Baseline (A)
         run: |
-          echo "Running warm-up..."
           autocannon -c 10 -d 5 ${{ github.event.inputs.test_url }}
-          echo "Running Baseline Load Test..."
           autocannon -c 100 -d 30 -j ${{ github.event.inputs.test_url }} > baseline-results.json
         
       - name: Stop Baseline Server
         working-directory: ./baseline
-        run: kill -9 $(cat server.pid) || true
+        run: |
+          TEST_PORT=$(echo "${{ github.event.inputs.test_url }}" | sed -E 's#.*:([0-9]+).*#\1#')
+          npx kill-port "$TEST_PORT" || true
 
       # ================== CANDIDATE (BRANCH B) ==================
       - name: Checkout Candidate Branch (B)
@@ -90,20 +91,21 @@ jobs:
       - name: Start Candidate Server
         working-directory: ./candidate
         run: |
+          TEST_PORT=$(echo "${{ github.event.inputs.test_url }}" | sed -E 's#.*:([0-9]+).*#\1#')
+          npx kill-port "$TEST_PORT" || true
           ${{ github.event.inputs.start_command }} &
-          echo $! > server.pid
           wait-on ${{ github.event.inputs.test_url }} -t 60000
 
       - name: Load Test Candidate (B)
         run: |
-          echo "Running warm-up..."
           autocannon -c 10 -d 5 ${{ github.event.inputs.test_url }}
-          echo "Running Candidate Load Test..."
           autocannon -c 100 -d 30 -j ${{ github.event.inputs.test_url }} > candidate-results.json
         
       - name: Stop Candidate Server
         working-directory: ./candidate
-        run: kill -9 $(cat server.pid) || true
+        run: |
+          TEST_PORT=$(echo "${{ github.event.inputs.test_url }}" | sed -E 's#.*:([0-9]+).*#\1#')
+          npx kill-port "$TEST_PORT" || true
 
       # ================== EVALUATION ==================
       - name: Checkout Evaluation Script

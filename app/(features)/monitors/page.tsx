@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import MonitorCard from "@/components/monitorCard";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import WebserverMonitorModal from "@/components/modals/webserver/webserverMonitorModal";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
@@ -29,7 +29,7 @@ export default function Page() {
   const socketRef = React.useRef<Socket | null>(null);
 
   // New Container/Stress Engine State
-  const [container, setContainer] = useState([] as any[]);
+  const [container, setContainer] = useState([] as ABResultData[]);
   const [selectedResult, setSelectedResult] = useState<ABResultData | null>(null);
   const [isGithubModalOpen, setIsGithubModalOpen] = useState(false);
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
@@ -39,6 +39,10 @@ export default function Page() {
   const [isEngineRunning, setIsEngineRunning] = useState(false);
   const [engineTarget, setEngineTarget] = useState<string | null>(null);
   const [engineError, setEngineError] = useState<string | null>(null);
+  const pollingIntervalRef = useRef<number | null>(null);
+  const pollingTimeoutRef = useRef<number | null>(null);
+  const pollingTargetRef = useRef<string | null>(null);
+  const pollingBaselineRef = useRef<number>(0);
 
   const { status } = useSession({
     required: true,
@@ -74,24 +78,57 @@ export default function Page() {
   };
 
   // --- NEW: FETCH AB TEST RESULTS ---
-  const fetchContainerResults = () => {
-    fetch("/api/abtest/results") // Fetch from ABTestLogs
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && Array.isArray(data.data)) {
-          // Flatten the nested results if your schema is repo-based
-          const flattened = data.data.flatMap((repo: any) => 
+  const fetchContainerResults = async () => {
+    try {
+      const res = await fetch("/api/abtest/results");
+      const data = await res.json();
+
+      if (data.success && Array.isArray(data.data)) {
+        const flattened = data.data
+          .flatMap((repo: any) =>
             (repo.abTests || []).map((test: any) => ({
               githubUrl: repo.githubUrl,
               metrics: test,
-              testedAt: test.testedAt
-            }))
-          ).sort((a: any, b: any) => new Date(b.testedAt).getTime() - new Date(a.testedAt).getTime());
-          
-          setContainer(flattened);
-        }
-      })
-      .catch((err) => console.error("Error fetching AB test logs:", err));
+              testedAt: test.testedAt,
+            })),
+          )
+          .sort((a: ABResultData, b: ABResultData) => new Date(b.testedAt).getTime() - new Date(a.testedAt).getTime());
+
+        setContainer(flattened);
+        return flattened;
+      }
+
+      return [] as ABResultData[];
+    } catch (err) {
+      console.error("Error fetching AB test logs:", err);
+      return [] as ABResultData[];
+    }
+  };
+
+  const getLatestTestTimestamp = (results: ABResultData[], githubUrl: string) => {
+    return results
+      .filter((result) => result.githubUrl === githubUrl)
+      .reduce((latest, result) => {
+        const testedAt = new Date(result.testedAt).getTime();
+        return testedAt > latest ? testedAt : latest;
+      }, 0);
+  };
+
+  const stopPollingForResults = () => {
+    if (pollingIntervalRef.current !== null) {
+      window.clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+
+    if (pollingTimeoutRef.current !== null) {
+      window.clearTimeout(pollingTimeoutRef.current);
+      pollingTimeoutRef.current = null;
+    }
+
+    pollingTargetRef.current = null;
+    pollingBaselineRef.current = 0;
+    setIsEngineRunning(false);
+    setEngineTarget(null);
   };
 
   React.useEffect(() => {
@@ -100,6 +137,18 @@ export default function Page() {
       fetchContainerResults(); // Load historical results on mount
     }
   }, [status]);
+
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current !== null) {
+        window.clearInterval(pollingIntervalRef.current);
+      }
+
+      if (pollingTimeoutRef.current !== null) {
+        window.clearTimeout(pollingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   React.useEffect(() => {
     if (status !== "authenticated") return;
@@ -187,9 +236,8 @@ export default function Page() {
     setIsEngineRunning(true);
     setEngineTarget(githubUrl);
     setEngineError(null);
-
-    // Keep track of the timeout ID so we can clear it if needed
-    let stressTestTimeoutId: NodeJS.Timeout | null = null;
+    pollingTargetRef.current = githubUrl;
+    pollingBaselineRef.current = getLatestTestTimestamp(container, githubUrl);
     
     try {
       if (!branches || branches.length !== 2) {
@@ -208,20 +256,35 @@ export default function Page() {
         throw new Error(data.error || 'Failed to start pipeline');
       }
 
-      // ASYNC UPDATE: The pipeline has started. 
-      // We keep the "Active" status for ~60s before allowing another run.
-      stressTestTimeoutId = setTimeout(() => {
-        // Warning: This could cause memory leak warning if component unmounts. 
-        // Best handled via useEffect to cleanup, or simply checking a mounted ref.
-        setIsEngineRunning(false);
-        setEngineTarget(null);
-        fetchContainerResults(); // Refresh list to see if results arrived
-      }, 60000);
+      const pollForResults = async () => {
+        if (!pollingTargetRef.current) return;
+
+        const latestResults = await fetchContainerResults();
+        const latestTimestamp = getLatestTestTimestamp(latestResults, pollingTargetRef.current);
+
+        if (latestTimestamp > pollingBaselineRef.current) {
+          stopPollingForResults();
+        }
+      };
+
+      await pollForResults();
+
+      pollingIntervalRef.current = window.setInterval(() => {
+        pollForResults().catch((pollError) => {
+          console.error("Error while polling for A/B results:", pollError);
+        });
+      }, 15000);
+
+      pollingTimeoutRef.current = window.setTimeout(() => {
+        if (pollingTargetRef.current) {
+          setEngineError("Timed out waiting for new A/B results.");
+        }
+        stopPollingForResults();
+      }, 10 * 60 * 1000);
 
     } catch (err: any) {
       setEngineError(err.message);
-      setIsEngineRunning(false);
-      setEngineTarget(null);
+      stopPollingForResults();
     }
   };
 

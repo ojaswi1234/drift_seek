@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { githubUrl, branches } = await req.json();
+    const { githubUrl, branches, buildCommand, startCommand } = await req.json();
     
     if (!githubUrl || !branches || branches.length !== 2) {
       return NextResponse.json({ success: false, error: "Missing GitHub URL or specific branches (must be exactly 2)" }, { status: 400 });
@@ -55,7 +55,9 @@ export async function POST(req: NextRequest) {
             target_repo: `${owner}/${repo}`,
             baseline_branch: baselineBranch,
             candidate_branch: candidateBranch,
-            seek_api_url: seek_api_url
+            seek_api_url: seek_api_url,
+            ...(buildCommand ? { build_command: buildCommand } : {}),
+            ...(startCommand ? { start_command: startCommand } : {})
           }
         })
       }
