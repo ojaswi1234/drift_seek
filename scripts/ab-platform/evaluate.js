@@ -114,22 +114,22 @@ const sendResults = () => {
         }
 
         const url = new URL(apiUrl);
-                const options = {
-                    hostname: url.hostname,
-                    port: url.port,
-                    path: url.pathname,
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Content-Length': Buffer.byteLength(payload)
-                    }
-                };
+        const options = {
+            hostname: url.hostname,
+            port: url.port,
+            path: url.pathname,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload)
+            }
+        };
 
-                // Attach API token header if present in environment
-                const apiToken = process.env.SEEK_API_TOKEN || '';
-                if (apiToken) {
-                    options.headers['x-seek-api-token'] = apiToken;
-                }
+        // Attach API token header if present in environment
+        const apiToken = process.env.SEEK_API_TOKEN || '';
+        if (apiToken) {
+            options.headers['x-seek-api-token'] = apiToken;
+        }
 
         const client = url.protocol === 'https:' ? https : http;
         const reqPost = client.request(options, (resPost) => {

@@ -6,8 +6,21 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !(session as any).accessToken) {
+    if (!session) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    const githubToken =
+      process.env.GITHUB_ACTION_TRIGGER_TOKEN ||
+      process.env.GITHUB_TOKEN ||
+      process.env.GH_PAT ||
+      (session as any).accessToken;
+
+    if (!githubToken) {
+      return NextResponse.json(
+        { success: false, error: "Missing GitHub trigger token" },
+        { status: 500 }
+      );
     }
 
     const { githubUrl, branches } = await req.json();
@@ -31,7 +44,7 @@ export async function POST(req: NextRequest) {
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${(session as any).accessToken}`,
+          Authorization: `Bearer ${githubToken}`,
           Accept: 'application/vnd.github.v3+json',
           'Content-Type': 'application/json'
         },
@@ -49,7 +62,14 @@ export async function POST(req: NextRequest) {
     if (!dispatchResponse.ok) {
       const errorData = await dispatchResponse.text();
       console.error("Failed to trigger GitHub Action:", errorData);
-      return NextResponse.json({ success: false, error: "Failed to trigger GitHub Action. Ensure ab-test.yml exists in the default branch of the target repository." }, { status: dispatchResponse.status });
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Failed to trigger the central A/B workflow. Ensure ab-test.yml exists in the default branch of ojaswi1234/drift_seek and the trigger token has workflow permissions.",
+        },
+        { status: dispatchResponse.status }
+      );
     }
 
     return NextResponse.json({ success: true, message: "A/B Performance Test pipeline started" }, { status: 200 });

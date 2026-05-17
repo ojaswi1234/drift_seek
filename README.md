@@ -70,6 +70,27 @@ Notes:
 - NEXT_PUBLIC_SOCKET_URL is optional. If set, monitors page connects to that external Socket.io service.
 - NEXT_PUBLIC_SOCKET_PATH defaults to /api/socketio for local internal route, but should be /socket.io for external realtime-server.
 
+## A/B Stress Test Workflow
+
+The A/B stress test workflow runs from this repository's `.github/workflows/ab-test.yml` and triggers the central pipeline in `ojaswi1234/drift_seek`.
+
+Required setup:
+
+- GitHub repo secret: `SEEK_API_TOKEN` for the workflow dispatch and result reporting.
+- Deployment env var: `MONGODB_URI` so the results API can persist runs.
+- Deployment env var: `GITHUB_ACTION_TRIGGER_TOKEN` or `GITHUB_TOKEN` if you want the app to dispatch the GitHub Action without relying on the visitor's OAuth token.
+
+Workflow input:
+
+- `seek_api_url` should be the public base URL of the deployed app that exposes `/api/abtest/results`.
+
+Result flow:
+
+1. The app triggers `ab-test.yml` in `ojaswi1234/drift_seek`.
+2. The workflow runs the benchmark against the target repository branches.
+3. `scripts/ab-platform/evaluate.js` posts the metrics to `/api/abtest/results`.
+4. The API stores the record in MongoDB and the stress report page reads it back.
+
 ## Installation
 
 ```bash
