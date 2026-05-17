@@ -24,20 +24,15 @@ interface GithubRepoModalProps {
 
 export default function GithubRepoModal({ isOpen, onClose, onSelectRepo, repos, isLoading }: GithubRepoModalProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Branch selection states
-  const [selectedRepoRef, setSelectedRepoRef] = useState<GitHubRepo | null>(null);
-  const [branches, setBranches] = useState<string[]>([]);
-  const [isFetchingBranches, setIsFetchingBranches] = useState(false);
-  const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
 
-  // Reset modal state when closed
+  const [selectedRepoRef, setSelectedRepoRef] = useState<GitHubRepo | null>(null);
+  const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
+
   useEffect(() => {
     if (!isOpen) {
       setSearchTerm('');
       setSelectedRepoRef(null);
-      setBranches([]);
-      setSelectedBranches([]);
+      setIsBranchModalOpen(false);
     }
   }, [isOpen]);
 
@@ -45,40 +40,12 @@ export default function GithubRepoModal({ isOpen, onClose, onSelectRepo, repos, 
 
   const handleRepoSelect = async (repo: GitHubRepo) => {
     setSelectedRepoRef(repo);
-    setIsFetchingBranches(true);
-    setBranches([]);
-    setSelectedBranches([]);
-    try {
-      const res = await fetch(`/api/gitbranch?owner=${repo.owner.login}&repo=${repo.name}`);
-      if (res.ok) {
-        const data = await res.json();
-        setBranches(data.map((b: any) => b.name));
-      } else {
-        console.error("Failed to fetch branches");
-      }
-    } catch (error) {
-      console.error("Error fetching branches:", error);
-    } finally {
-      setIsFetchingBranches(false);
-    }
+    setIsBranchModalOpen(true);
   };
 
-  const handleBranchClick = (branch: string) => {
-    if (selectedBranches.includes(branch)) {
-      setSelectedBranches(selectedBranches.filter(b => b !== branch));
-    } else {
-      if (selectedBranches.length < 2) {
-        setSelectedBranches([...selectedBranches, branch]);
-      }
-    }
-  };
-
-  const handleConfirm = () => {
-    if (selectedRepoRef) {
-      const targetUrl = `https://github.com/${selectedRepoRef.owner.login}/${selectedRepoRef.name}`;
-      onSelectRepo(targetUrl, selectedBranches);
-      onClose();
-    }
+  const returnToRepoList = () => {
+    setIsBranchModalOpen(false);
+    setSelectedRepoRef(null);
   };
 
   const filteredRepos = repos.filter(repo => 
@@ -105,72 +72,31 @@ export default function GithubRepoModal({ isOpen, onClose, onSelectRepo, repos, 
         {selectedRepoRef ? (
           <div className="flex flex-col flex-1 overflow-hidden">
             <p className="text-sm text-gray-600 mb-4 shrink-0">
-              Please choose exactly 2 branches to compare. ({selectedBranches.length}/2 selected)
+              Select a repository to continue into the nested branch selection modal.
             </p>
-            
-            <div className="overflow-y-auto space-y-2 pr-2 scrollbtn flex-1 min-h-0">
-              {isFetchingBranches ? (
-                 <div className="flex flex-col items-center justify-center py-12 text-gray-400 animate-pulse">
-                    <span className="text-sm tracking-widest uppercase font-bold">Fetching Branches...</span>
-                 </div>
-              ) : branches.length === 0 ? (
-                 <div className="text-center py-12 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-lg">
-                    No branches found for this repository.
-                 </div>
-              ) : (
-                branches.map((branch) => {
-                  const isSelected = selectedBranches.includes(branch);
-                  return (
-                    <button
-                      key={branch}
-                      onClick={() => handleBranchClick(branch)}
-                      className={`w-full text-left p-3 border rounded-lg transition-all ${
-                        isSelected 
-                          ? 'border-black bg-gray-50 font-bold' 
-                          : 'border-gray-200 hover:border-black'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <GitFork size={16} className={isSelected ? 'text-black' : 'text-gray-400'} />
-                        {branch}
-                      </span>
-                    </button>
-                  );
-                })
-              )}
+
+            <div className="overflow-y-auto space-y-3 pr-2 scrollbtn flex-1 min-h-[40vh]">
+              <button
+                onClick={() => setIsBranchModalOpen(true)}
+                className="w-full p-4 bg-black text-white rounded-lg font-bold uppercase tracking-widest hover:bg-gray-800 transition-colors"
+              >
+                Open Branch Selection
+              </button>
+              <button
+                onClick={returnToRepoList}
+                className="w-full p-4 bg-gray-100 text-black rounded-lg font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors"
+              >
+                Choose Another Repository
+              </button>
             </div>
 
-            {/* Footer */}
-            <div className="mt-6 pt-4 border-t border-gray-100 flex justify-between shrink-0">
-                <button 
-                  onClick={() => {
-                    setSelectedRepoRef(null);
-                    setBranches([]);
-                    setSelectedBranches([]);
-                  }}
-                  className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-black text-sm uppercase tracking-widest transition-colors font-bold rounded-lg"
-                >
-                  Back
-                </button>
-                <div className="flex items-center gap-3">
-                    <button 
-                      onClick={onClose}
-                      className="px-6 py-2.5 text-gray-500 hover:text-black text-sm uppercase tracking-widest transition-colors font-bold"
-                    >
-                      Cancel
-                    </button>
-                    <button 
-                      onClick={handleConfirm}
-                      disabled={selectedBranches.length !== 2}
-                      className={`px-6 py-2.5 text-sm uppercase tracking-widest transition-colors font-bold rounded-lg ${
-                        selectedBranches.length === 2 
-                          ? 'bg-black text-white hover:bg-gray-800' 
-                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      }`}
-                    >
-                      Confirm
-                    </button>
-                </div>
+            <div className="mt-6 pt-4 border-t border-gray-100 flex justify-end shrink-0">
+              <button
+                onClick={onClose}
+                className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-black text-sm uppercase tracking-widest transition-colors font-bold rounded-lg"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         ) : (
@@ -240,6 +166,184 @@ export default function GithubRepoModal({ isOpen, onClose, onSelectRepo, repos, 
             </div>
           </div>
         )}
+      </div>
+
+      <GithubBranchSelectionModal
+        isOpen={isBranchModalOpen && Boolean(selectedRepoRef)}
+        repo={selectedRepoRef}
+        onClose={() => setIsBranchModalOpen(false)}
+        onBack={returnToRepoList}
+        onConfirm={(branches) => {
+          if (!selectedRepoRef) return;
+          const targetUrl = `https://github.com/${selectedRepoRef.owner.login}/${selectedRepoRef.name}`;
+          onSelectRepo(targetUrl, branches);
+          onClose();
+        }}
+      />
+    </div>
+  );
+}
+
+function GithubBranchSelectionModal({
+  isOpen,
+  repo,
+  onClose,
+  onBack,
+  onConfirm,
+}: {
+  isOpen: boolean;
+  repo: GitHubRepo | null;
+  onClose: () => void;
+  onBack: () => void;
+  onConfirm: (branches: string[]) => void;
+}) {
+  const [branches, setBranches] = useState<string[]>([]);
+  const [isFetchingBranches, setIsFetchingBranches] = useState(false);
+  const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!isOpen || !repo) return;
+
+    let cancelled = false;
+
+    const loadBranches = async () => {
+      setIsFetchingBranches(true);
+      setBranches([]);
+      setSelectedBranches([]);
+
+      try {
+        const res = await fetch(`/api/gitbranch?owner=${repo.owner.login}&repo=${repo.name}`);
+        if (!res.ok) {
+          throw new Error("Failed to fetch branches");
+        }
+
+        const data = await res.json();
+        if (!cancelled) {
+          setBranches(data.map((branch: any) => branch.name));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Error fetching branches:", error);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsFetchingBranches(false);
+        }
+      }
+    };
+
+    loadBranches();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, repo]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setBranches([]);
+      setSelectedBranches([]);
+      setIsFetchingBranches(false);
+    }
+  }, [isOpen]);
+
+  if (!isOpen || !repo) return null;
+
+  const handleBranchClick = (branch: string) => {
+    if (selectedBranches.includes(branch)) {
+      setSelectedBranches(selectedBranches.filter((selectedBranch) => selectedBranch !== branch));
+      return;
+    }
+
+    if (selectedBranches.length < 2) {
+      setSelectedBranches([...selectedBranches, branch]);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
+      <div className="bg-white border border-gray-200 p-6 rounded-2xl w-full max-w-4xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 font-sans text-black flex flex-col max-h-[90vh]">
+        <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4 shrink-0">
+          <div>
+            <h2 className="text-xl font-bold font-orbitron tracking-wide text-black">
+              Select Branches: {repo.name}
+            </h2>
+            <p className="text-xs text-gray-500 font-mono mt-1">{repo.owner.login}/{repo.name}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-gray-400 hover:text-black hover:bg-gray-100 rounded-md transition-all"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <p className="text-sm text-gray-600 mb-4 shrink-0">
+            Please choose exactly 2 branches to compare. ({selectedBranches.length}/2 selected)
+          </p>
+
+          <div className="overflow-y-auto space-y-2 pr-2 scrollbtn flex-1 min-h-0">
+            {isFetchingBranches ? (
+              <div className="flex flex-col items-center justify-center py-12 text-gray-400 animate-pulse">
+                <span className="text-sm tracking-widest uppercase font-bold">Fetching Branches...</span>
+              </div>
+            ) : branches.length === 0 ? (
+              <div className="text-center py-12 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-lg">
+                No branches found for this repository.
+              </div>
+            ) : (
+              branches.map((branch) => {
+                const isSelected = selectedBranches.includes(branch);
+
+                return (
+                  <button
+                    key={branch}
+                    onClick={() => handleBranchClick(branch)}
+                    className={`w-full text-left p-3 border rounded-lg transition-all ${
+                      isSelected
+                        ? 'border-black bg-gray-50 font-bold'
+                        : 'border-gray-200 hover:border-black'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <GitFork size={16} className={isSelected ? 'text-black' : 'text-gray-400'} />
+                      {branch}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-gray-100 flex justify-between shrink-0">
+            <button
+              onClick={onBack}
+              className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-black text-sm uppercase tracking-widest transition-colors font-bold rounded-lg"
+            >
+              Back
+            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onClose}
+                className="px-6 py-2.5 text-gray-500 hover:text-black text-sm uppercase tracking-widest transition-colors font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => onConfirm(selectedBranches)}
+                disabled={selectedBranches.length !== 2}
+                className={`px-6 py-2.5 text-sm uppercase tracking-widest transition-colors font-bold rounded-lg ${
+                  selectedBranches.length === 2
+                    ? 'bg-black text-white hover:bg-gray-800'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
