@@ -79,6 +79,7 @@ Required setup:
 - GitHub repo secret: `SEEK_API_TOKEN` for the workflow dispatch and result reporting.
 - Deployment env var: `MONGODB_URI` so the results API can persist runs.
 - Deployment env var: `GITHUB_ACTION_TRIGGER_TOKEN` or `GITHUB_TOKEN` if you want the app to dispatch the GitHub Action without relying on the visitor's OAuth token.
+- GitHub OAuth sign-in now requests the `workflow` scope, so users should sign out and sign back in after this change before triggering the test.
 
 Workflow input:
 
