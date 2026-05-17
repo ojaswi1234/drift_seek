@@ -7,8 +7,9 @@ import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import GlobalLoader from "@/components/GlobalLoader";
 import GithubRepoModal, { GitHubRepo } from "@/components/modals/githubRepos/githubrepoModal";
+import ABResultStatsModal, { ABResultData } from "@/components/modals/results/ABResultStatsModal";
 import { io, Socket } from "socket.io-client";
-import { Activity, Clock, Terminal, Zap, GitBranch, RefreshCw } from "lucide-react";
+import { Activity, Eye, RefreshCw } from "lucide-react";
 
 type MonitorSocketPayload = {
   id: string;
@@ -29,6 +30,7 @@ export default function Page() {
 
   // New Container/Stress Engine State
   const [container, setContainer] = useState([] as any[]);
+  const [selectedResult, setSelectedResult] = useState<ABResultData | null>(null);
   const [isGithubModalOpen, setIsGithubModalOpen] = useState(false);
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
   const [isFetchingRepos, setIsFetchingRepos] = useState(false);
@@ -341,7 +343,7 @@ export default function Page() {
           ) : (
             <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-10 scrollbtn">
               {container.map((item, index) => (
-                <ContainerMetricCard key={index} data={item} />
+                <ContainerMetricCard key={index} data={item} onOpenStats={(result) => setSelectedResult(result)} />
               ))}
             </div>
           )}
@@ -365,49 +367,33 @@ export default function Page() {
           fetchMonitors();
         }}
       />
+
+      <ABResultStatsModal
+        isOpen={Boolean(selectedResult)}
+        onClose={() => setSelectedResult(null)}
+        data={selectedResult}
+      />
     </div>
   );
 }
 
 // Sub-component to render the pipeline results cleanly in the light theme
-function ContainerMetricCard({ data }: { data: any }) {
-  const { metrics, githubUrl, testedAt } = data;
-  const isHealthy = metrics.passed !== false;
+function ContainerMetricCard({ data, onOpenStats }: { data: ABResultData; onOpenStats: (data: ABResultData) => void }) {
+  const { githubUrl } = data;
 
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 shadow-sm font-sans relative overflow-hidden mb-4">
-      <div className={`absolute top-0 left-0 w-1.5 h-full ${isHealthy ? 'bg-emerald-500' : 'bg-red-500'}`} />
-      
-      <div className="pl-3">
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex items-center gap-2 overflow-hidden">
-            <GitBranch size={16} className="text-gray-500 shrink-0" />
-            <h3 className="font-bold text-gray-900 truncate font-mono text-sm" title={githubUrl}>
-              {githubUrl.replace('https://github.com/', '')}
-            </h3>
-          </div>
-          <span className="text-xs text-gray-400 shrink-0 font-mono">
-            {new Date(testedAt).toLocaleTimeString()}
-          </span>
-        </div>
-
-        <p className="text-sm font-bold text-gray-600 mb-3">Branches Mapped: <span className="text-black">{metrics.baselineBranch}</span> vs <span className="text-black">{metrics.candidateBranch}</span></p>
-
-        <div className="grid grid-cols-2 bg-white rounded border border-gray-200 p-3 mb-3 shadow-inner">
-           <div>
-              <span className="text-xs text-gray-500 uppercase tracking-wider font-bold">Baseline</span>
-              <div className="text-sm mt-1">RPS: <span className="font-mono font-bold text-black">{Number(metrics.baselineMetrics?.requestsPerSecond || 0).toFixed(1)}</span></div>
-              <div className="text-sm text-gray-600">p99: <span className="font-mono">{metrics.baselineMetrics?.latency99th}ms</span></div>
-           </div>
-           <div>
-              <span className="text-xs text-gray-500 uppercase tracking-wider font-bold">Candidate</span>
-              <div className="text-sm mt-1">RPS: <span className="font-mono font-bold text-black">{Number(metrics.candidateMetrics?.requestsPerSecond || 0).toFixed(1)}</span></div>
-              <div className="text-sm text-gray-600">p99: <span className="font-mono">{metrics.candidateMetrics?.latency99th}ms</span></div>
-           </div>
-        </div>
-        <div className={`text-xs py-1.5 px-3 rounded-md uppercase tracking-wider font-bold inline-flex items-center gap-2 ${isHealthy ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-          {isHealthy ? "Performance Win 🏆" : "Degradation limit reached ❌"}
-        </div>
+    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 shadow-sm font-sans mb-4">
+      <div className="flex items-center justify-between gap-4">
+        <h3 className="font-bold text-gray-900 truncate font-mono text-sm" title={githubUrl}>
+          {githubUrl.replace("https://github.com/", "")}
+        </h3>
+        <button
+          onClick={() => onOpenStats(data)}
+          className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-300 bg-white hover:bg-gray-100 text-xs font-bold uppercase tracking-wider transition-colors"
+        >
+          <Eye size={14} />
+          View Stats
+        </button>
       </div>
     </div>
   );
