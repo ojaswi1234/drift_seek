@@ -34,6 +34,8 @@ export async function POST(req: NextRequest) {
     const owner = urlParts[urlParts.length - 2];
     const repo = urlParts[urlParts.length - 1];
 
+    const seek_api_url = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
     const baselineBranch = branches[0];
     const candidateBranch = branches[1];
 
@@ -52,7 +54,8 @@ export async function POST(req: NextRequest) {
           inputs: {
             target_repo: `${owner}/${repo}`,
             baseline_branch: baselineBranch,
-            candidate_branch: candidateBranch
+            candidate_branch: candidateBranch,
+            seek_api_url: seek_api_url
           }
         })
       }
