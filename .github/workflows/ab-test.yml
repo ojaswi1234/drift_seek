@@ -110,7 +110,7 @@ jobs:
       # ================== EVALUATION ==================
       - name: Checkout Evaluation Script
         uses: actions/checkout@v4
-        with:~
+        with:
           repository: 'ojaswi1234/drift_seek'
           path: tools
 
