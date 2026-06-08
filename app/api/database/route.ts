@@ -6,6 +6,7 @@ import redis from "@/lib/redis";
 import { getServerSession } from "next-auth/next";
 // UPDATE THIS PATH TO MATCH YOUR NEXTAUTH CONFIG LOCATION:
 import { authOptions } from "@/app/api/auth/[...nextauth]/route"; 
+import { createMonitorSchema, deleteMonitorSchema } from "@/lib/validation/schemas";
 
 export const dynamic = 'force-dynamic';
 
@@ -46,12 +47,11 @@ export async function GET() {
   }
 }
 
-interface WebServerBody {
-  [key: string]: any; // Changed to any to allow dynamic injection of ownerEmail
-}
-
-interface WebServerDocument extends WebServerBody {
+interface WebServerDocument {
   _id: string;
+  name: string;
+  url: string;
+  ownerEmail: string;
   createdAt?: Date;
   updatedAt?: Date;
   toObject(): any;
@@ -66,24 +66,25 @@ export async function POST(req: NextRequest): Promise<Response> {
     }
 
     await dbConnect();
-    const body: WebServerBody = await req.json();
-    let cleanUrl = body.url as string;
-    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
-      cleanUrl = `https://${cleanUrl}`; // Auto-append https if missing
+    const body = await req.json();
+
+    // Validate request body using Zod schema
+    const validationResult = createMonitorSchema.safeParse(body);
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { message: "Validation failed", errors: validationResult.error.issues },
+        { status: 400 }
+      );
     }
 
-    // Optional: Strictly validate it's a real URL format before saving
-    try {
-      new URL(cleanUrl);
-    } catch (e) {
-      return NextResponse.json({ message: "Invalid URL format" }, { status: 400 });
-    }
+    const { name, url } = validationResult.data;
 
-    body.url = cleanUrl; // Replace the bad input with the clean one
-    // 2. Inject the verified email from the session into the payload
-    body.ownerEmail = session.user.email;
-
-    const webserver: WebServerDocument = await WebServer.create(body);
+    // 2. Create the monitor document, explicitly selecting only allowed fields to prevent mass-assignment
+    const webserver: WebServerDocument = await WebServer.create({
+      name,
+      url,
+      ownerEmail: session.user.email,
+    });
 
     const localUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
     fetch(`${localUrl}/api/monitor/ping`, {
@@ -131,15 +132,19 @@ export async function DELETE(req: NextRequest): Promise<Response> {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     
-    if (!id) {
+    // Validate ID parameter using Zod schema
+    const validationResult = deleteMonitorSchema.safeParse({ id });
+    if (!validationResult.success) {
       return NextResponse.json(
-        { message: "ID is required" },
+        { message: "Validation failed", errors: validationResult.error.issues },
         { status: 400 }
       );
     }
 
-    // 2. Optional but highly recommended: Ensure the user actually owns the server they are deleting
-    const serverToDelete = await WebServer.findById(id);
+    const validatedId = validationResult.data.id;
+
+    // 2. Ensure the user actually owns the server they are deleting
+    const serverToDelete = await WebServer.findById(validatedId);
     if (!serverToDelete) {
       return NextResponse.json({ message: "Server not found" }, { status: 404 });
     }
@@ -148,7 +153,7 @@ export async function DELETE(req: NextRequest): Promise<Response> {
       return NextResponse.json({ message: "Forbidden: You do not own this monitor" }, { status: 403 });
     }
 
-    await WebServer.findByIdAndDelete(id);
+    await WebServer.findByIdAndDelete(validatedId);
     return NextResponse.json({ message: "Deleted successfully" });
   } catch (error) {
     console.error("Delete error:", error);
