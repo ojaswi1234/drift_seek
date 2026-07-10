@@ -19,6 +19,8 @@ function Page() {
   const [isstatus, setStatus] = useState<StatusObject | string | null>(null);
   const urlRef = useRef<HTMLInputElement>(null);
   const [githubData, setGithubData] = useState(0);
+  const [monitorsCount, setMonitorsCount] = useState(0);
+  const [pipelinesCount, setPipelinesCount] = useState(0);
 
   const { status } = useSession({
     required: true,
@@ -65,6 +67,7 @@ function Page() {
 
   useEffect(() => {
     if (status === "authenticated") {
+      // 1. Fetch repos count
       fetch("/api/github/repos")
         .then((res) => res.json())
         .then((data) => {
@@ -78,6 +81,34 @@ function Page() {
         .catch((err) => {
           console.error("Failed to fetch GitHub repos:", err);
           setGithubData(0);
+        });
+
+      // 2. Fetch active monitors count
+      fetch("/api/database")
+        .then((res) => res.json())
+        .then((data) => {
+          const count = Array.isArray(data) ? data.length : 0;
+          setMonitorsCount(count);
+        })
+        .catch((err) => {
+          console.error("Failed to fetch monitors count:", err);
+          setMonitorsCount(0);
+        });
+
+      // 3. Fetch pipelines/stress tests results count
+      fetch("/api/abtest/results")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && Array.isArray(data.data)) {
+            const totalTests = data.data.reduce((sum: number, repo: any) => sum + (repo.abTests?.length || 0), 0);
+            setPipelinesCount(totalTests);
+          } else {
+            setPipelinesCount(0);
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to fetch pipeline results count:", err);
+          setPipelinesCount(0);
         });
     }
   }, [status]);
@@ -188,15 +219,15 @@ function Page() {
         {/* Uptime Monitors / Containers Section */}
         <div className="bg-zinc-600/20 justify-center flex flex-col items-center gap-2 font-orbitron p-8 md:p-12 hover:bg-zinc-600/30 transition-all cursor-crosshair group">
           <Activity className="mb-2 text-zinc-500 group-hover:text-green-600 transition-colors" />
-          <span className="text-3xl font-bold">0</span>
+          <span className="text-3xl font-bold">{monitorsCount}</span>
           <span className="text-xs uppercase tracking-widest text-zinc-600 group-hover:text-black">Active Monitors</span>
         </div>
 
         {/* Automation / Pipelines Section */}
         <div className="bg-zinc-600/20 justify-center flex flex-col items-center gap-2 font-orbitron p-8 md:p-12 hover:bg-zinc-600/30 transition-all cursor-crosshair group">
           <Bot className="mb-2 text-zinc-500 group-hover:text-blue-600 transition-colors" />
-          <span className="text-3xl font-bold">0</span>
-          <span className="text-xs uppercase tracking-widest text-zinc-600 group-hover:text-black">Jenkins Jobs</span>
+          <span className="text-3xl font-bold">{pipelinesCount}</span>
+          <span className="text-xs uppercase tracking-widest text-zinc-600 group-hover:text-black">Pipeline Runs</span>
         </div>
       </div>
     </div>

@@ -10,6 +10,30 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // If mock/guest access token, return fallback mock repos
+  if ((session as any).accessToken === "mock-guest-access-token") {
+    return NextResponse.json([
+      {
+        id: 1,
+        name: "drift_seek_sandbox",
+        owner: { login: "guest_dev" },
+        html_url: "https://github.com/guest_dev/drift_seek_sandbox",
+        private: false,
+        stargazers_count: 42,
+        forks_count: 7,
+      },
+      {
+        id: 2,
+        name: "microservices-uptime-monitor",
+        owner: { login: "guest_dev" },
+        html_url: "https://github.com/guest_dev/microservices-uptime-monitor",
+        private: true,
+        stargazers_count: 12,
+        forks_count: 2,
+      }
+    ]);
+  }
+
   // Use the session's access token to fetch the repos
   const res = await fetch('https://api.github.com/user/repos?per_page=100&sort=updated', {
     headers: {

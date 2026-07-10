@@ -12,7 +12,7 @@ import {
   Search, // Drift Detection
 } from "lucide-react";
 import LoginBtn from "@/components/login-btn";
-import { useSession } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 
 export default function Home() {
   
@@ -118,7 +118,10 @@ export default function Home() {
             (
             <div className="mt-8 flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
           <LoginBtn />
-          <button className="border border-black cursor-pointer bg-transparent text-black px-6 py-3 font-orbitron uppercase text-xs md:text-sm tracking-widest hover:bg-black hover:text-white transition-all">
+          <button 
+            onClick={() => signIn("credentials", { callbackUrl: "/dashboard" })}
+            className="border border-black cursor-pointer bg-transparent text-black px-6 py-3 font-orbitron uppercase text-xs md:text-sm tracking-widest hover:bg-black hover:text-white transition-all"
+          >
             Guest Sandbox
           </button>
           </div>

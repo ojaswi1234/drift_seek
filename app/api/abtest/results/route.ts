@@ -12,23 +12,28 @@ export async function GET() {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const res = await fetch('https://api.github.com/user/repos?per_page=100&sort=updated', {
-      headers: {
-        Authorization: `Bearer ${(session as any).accessToken}`,
-        Accept: 'application/vnd.github.v3+json',
-      }
-    });
+    await dbConnect();
+    let query = {};
 
-    const reposData = await res.json();
-    if (!Array.isArray(reposData)) {
-       throw new Error("Unable to fetch user repositories from GitHub");
+    if ((session as any).accessToken !== "mock-guest-access-token") {
+      const res = await fetch('https://api.github.com/user/repos?per_page=100&sort=updated', {
+        headers: {
+          Authorization: `Bearer ${(session as any).accessToken}`,
+          Accept: 'application/vnd.github.v3+json',
+        }
+      });
+
+      const reposData = await res.json();
+      if (Array.isArray(reposData)) {
+        const userGithubUrls = reposData.map((repo: any) => repo.html_url);
+        query = { githubUrl: { $in: userGithubUrls } };
+      } else {
+        query = { githubUrl: "nonexistent-fallback" };
+      }
     }
 
-    const userGithubUrls = reposData.map((repo: any) => repo.html_url);
-
-    await dbConnect();
     const logs = await ABTestLogs.find(
-      { githubUrl: { $in: userGithubUrls } },
+      query,
       { abTests: { $slice: -10 } }
     ).sort({ 'abTests.testedAt': -1 });
 

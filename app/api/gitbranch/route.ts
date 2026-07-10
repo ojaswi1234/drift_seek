@@ -9,6 +9,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // If mock/guest access token, return fallback mock branches
+  if ((session as any).accessToken === "mock-guest-access-token") {
+    return NextResponse.json([
+      { name: "main" },
+      { name: "dev" },
+      { name: "production" }
+    ]);
+  }
+
   const { searchParams } = new URL(request.url);
   const owner = searchParams.get('owner');
   const repo = searchParams.get('repo');
