@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_GITHUB_AUTH_CONFIGURED: (process.env.GITHUB_ID && process.env.GITHUB_SECRET) ? "true" : "false"
+  },
   compiler: {
     styledComponents: true,
   },

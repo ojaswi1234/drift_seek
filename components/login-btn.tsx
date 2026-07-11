@@ -40,13 +40,20 @@ export default function AuthModal() {
                 Authorization required to proceed
               </p>
 
-              <button
-                onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
-                className="w-full flex items-center justify-center gap-4 border border-black bg-black text-white px-6 py-4 font-orbitron uppercase text-xs md:text-sm tracking-widest hover:bg-zinc-800 transition-all active:translate-x-1 active:translate-y-1 active:shadow-none cursor-pointer"
-              >
-                <Github size={20} />
-                Sign in with GitHub
-              </button>
+              {process.env.NEXT_PUBLIC_GITHUB_AUTH_CONFIGURED === "false" ? (
+                <div className="border border-red-500 bg-red-50 text-red-700 p-4 font-sans text-xs rounded-lg mb-4">
+                  <p className="font-bold uppercase tracking-wider mb-1">GitHub Auth Not Configured</p>
+                  <p className="leading-relaxed">Please define <code>GITHUB_ID</code> and <code>GITHUB_SECRET</code> environment variables in your <code>.env.local</code> file and restart the dev server to enable GitHub Sign In.</p>
+                </div>
+              ) : (
+                <button
+                  onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
+                  className="w-full flex items-center justify-center gap-4 border border-black bg-black text-white px-6 py-4 font-orbitron uppercase text-xs md:text-sm tracking-widest hover:bg-zinc-800 transition-all active:translate-x-1 active:translate-y-1 active:shadow-none cursor-pointer"
+                >
+                  <Github size={20} />
+                  Sign in with GitHub
+                </button>
+              )}
 
               <div className="mt-12 pt-4 border-t border-zinc-100 flex justify-between items-center text-[9px] text-zinc-400 uppercase tracking-widest">
                 <span>Node_Auth_v2</span>
