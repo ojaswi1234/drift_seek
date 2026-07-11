@@ -10,6 +10,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
+    try {
+      const { checkRateLimit } = await import("@/lib/rateLimiter");
+      await checkRateLimit(req, 5);
+    } catch (err: any) {
+      if (err.message === "RATE_LIMIT_EXCEEDED") {
+        return NextResponse.json({ success: false, error: "Rate limit exceeded" }, { status: 429 });
+      }
+    }
+
     const { githubUrl, branches, buildCommand, startCommand } = await req.json();
 
     const githubToken =
@@ -17,53 +26,10 @@ export async function POST(req: NextRequest) {
       process.env.GITHUB_TOKEN ||
       process.env.GH_PAT;
 
-    // Guest Sandbox Simulation Mode
-    if (((session as any).accessToken === "mock-guest-access-token") || !githubToken) {
-      // Simulate pipeline execution and save mock results to MongoDB asynchronously
-      const dbConnect = (await import("@/lib/db_connect")).default;
-      const ABTestLogs = (await import("@/lib/models/ABTestLogs")).default;
-
-      setTimeout(async () => {
-        try {
-          await dbConnect();
-          const mockResult = {
-            testedAt: new Date(),
-            baselineBranch: branches?.[0] || "main",
-            candidateBranch: branches?.[1] || "dev",
-            baselineMetrics: {
-              requestsPerSecond: Math.floor(Math.random() * 150) + 250,
-              latencyAverage: Math.floor(Math.random() * 20) + 15,
-              latency99th: Math.floor(Math.random() * 40) + 50,
-              successRate: 100
-            },
-            candidateMetrics: {
-              requestsPerSecond: Math.floor(Math.random() * 200) + 300,
-              latencyAverage: Math.floor(Math.random() * 10) + 8,
-              latency99th: Math.floor(Math.random() * 20) + 30,
-              successRate: 100
-            },
-            passed: true
-          };
-
-          let logEntity = await ABTestLogs.findOne({ githubUrl });
-          if (!logEntity) {
-            logEntity = new ABTestLogs({
-              githubUrl,
-              abTests: [mockResult]
-            });
-          } else {
-            logEntity.abTests.push(mockResult);
-          }
-          await logEntity.save();
-          console.log(`[GUEST MOCK PIPELINE] Saved simulation results for ${githubUrl}`);
-        } catch (e) {
-          console.error("[GUEST MOCK PIPELINE ERROR]:", e);
-        }
-      }, 5000);
-
+    if (!githubToken) {
       return NextResponse.json(
-        { success: true, message: "A/B Performance Test pipeline started (GUEST SANDBOX SIMULATION)" },
-        { status: 200 }
+        { success: false, error: "Missing GitHub trigger token" },
+        { status: 500 }
       );
     }
     

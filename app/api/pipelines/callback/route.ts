@@ -4,6 +4,23 @@ import ABTestLogs from "@/lib/models/ABTestLogs";
 
 export async function POST(req: NextRequest) {
   try {
+    // Simple token-based auth to prevent unwanted posts from public callers
+    const incomingToken = (req.headers.get('x-seek-api-token') || '').trim();
+    const expectedToken = process.env.SEEK_API_TOKEN || '';
+
+    if (expectedToken && incomingToken !== expectedToken) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    try {
+      const { checkRateLimit } = await import("@/lib/rateLimiter");
+      await checkRateLimit(req, 20);
+    } catch (err: any) {
+      if (err.message === "RATE_LIMIT_EXCEEDED") {
+        return NextResponse.json({ success: false, error: "Rate limit exceeded" }, { status: 429 });
+      }
+    }
+
     await dbConnect();
     const body = await req.json();
     const { githubUrl, metrics } = body;

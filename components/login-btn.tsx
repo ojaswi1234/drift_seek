@@ -48,19 +48,6 @@ export default function AuthModal() {
                 Sign in with GitHub
               </button>
 
-              <div className="relative flex py-5 items-center">
-                <div className="flex-grow border-t border-zinc-200"></div>
-                <span className="flex-shrink mx-4 text-zinc-400 text-xs font-mono">OR</span>
-                <div className="flex-grow border-t border-zinc-200"></div>
-              </div>
-
-              <button
-                onClick={() => signIn("credentials", { callbackUrl: "/dashboard" })}
-                className="w-full flex items-center justify-center gap-4 border border-black bg-white text-black px-6 py-4 font-orbitron uppercase text-xs md:text-sm tracking-widest hover:bg-zinc-100 transition-all active:translate-x-1 active:translate-y-1 active:shadow-none cursor-pointer"
-              >
-                Sign in as Guest Sandbox
-              </button>
-
               <div className="mt-12 pt-4 border-t border-zinc-100 flex justify-between items-center text-[9px] text-zinc-400 uppercase tracking-widest">
                 <span>Node_Auth_v2</span>
                 <span className="flex items-center gap-2">

@@ -17,10 +17,6 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "avatars.githubusercontent.com",
       },
-      {
-        protocol: "https",
-        hostname: "avatar.iran.liara.run",
-      },
     ],
   },
    turbopack: {},

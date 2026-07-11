@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '../../../../lib/db_connect';
 import WebServer from '../../../../lib/models/WebServer';
 import redis from '@/lib/redis';
@@ -35,8 +33,17 @@ async function calculateLatency(url: string): Promise<{ latency: number; status:
   return { latency: Math.round(end - start), status, reason };
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    try {
+      const { checkRateLimit } = await import("@/lib/rateLimiter");
+      await checkRateLimit(req, 20);
+    } catch (err: any) {
+      if (err.message === "RATE_LIMIT_EXCEEDED") {
+        return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+      }
+    }
+
     await dbConnect();
     const body = await req.json();
     const { id, url: reqUrl } = body;

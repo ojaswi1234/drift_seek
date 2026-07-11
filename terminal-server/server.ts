@@ -193,10 +193,14 @@ app.post("/run-github-stress-test", (req, res) => {
       };
 
       const targetVercelUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "https://drift-seek.vercel.app";
+      const seekApiToken = process.env.SEEK_API_TOKEN || "";
       
       await fetch(`${targetVercelUrl}/api/pipelines/callback`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-seek-api-token": seekApiToken
+        },
         body: JSON.stringify({ githubUrl, metrics })
       })
       .then(res => {

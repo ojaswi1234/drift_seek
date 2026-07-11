@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db_connect';
 import ABTestLogs from '@/lib/models/ABTestLogs';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
@@ -12,28 +12,33 @@ export async function GET() {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    await dbConnect();
-    let query = {};
-
-    if ((session as any).accessToken !== "mock-guest-access-token") {
-      const res = await fetch('https://api.github.com/user/repos?per_page=100&sort=updated', {
-        headers: {
-          Authorization: `Bearer ${(session as any).accessToken}`,
-          Accept: 'application/vnd.github.v3+json',
-        }
-      });
-
-      const reposData = await res.json();
-      if (Array.isArray(reposData)) {
-        const userGithubUrls = reposData.map((repo: any) => repo.html_url);
-        query = { githubUrl: { $in: userGithubUrls } };
-      } else {
-        query = { githubUrl: "nonexistent-fallback" };
+    try {
+      const { checkRateLimit } = await import("@/lib/rateLimiter");
+      await checkRateLimit(req, 30);
+    } catch (err: any) {
+      if (err.message === "RATE_LIMIT_EXCEEDED") {
+        return NextResponse.json({ success: false, error: "Rate limit exceeded" }, { status: 429 });
       }
     }
 
+    await dbConnect();
+
+    const res = await fetch('https://api.github.com/user/repos?per_page=100&sort=updated', {
+      headers: {
+        Authorization: `Bearer ${(session as any).accessToken}`,
+        Accept: 'application/vnd.github.v3+json',
+      }
+    });
+
+    const reposData = await res.json();
+    if (!Array.isArray(reposData)) {
+       throw new Error("Unable to fetch user repositories from GitHub");
+    }
+
+    const userGithubUrls = reposData.map((repo: any) => repo.html_url);
+
     const logs = await ABTestLogs.find(
-      query,
+      { githubUrl: { $in: userGithubUrls } },
       { abTests: { $slice: -10 } }
     ).sort({ 'abTests.testedAt': -1 });
 

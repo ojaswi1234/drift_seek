@@ -23,6 +23,15 @@ async function runDiagnostic(url: string) {
 }
 
 export async function GET(request: NextRequest) {
+  try {
+    const { checkRateLimit } = await import("@/lib/rateLimiter");
+    await checkRateLimit(request, 15);
+  } catch (err: any) {
+    if (err.message === "RATE_LIMIT_EXCEEDED") {
+      return NextResponse.json({ message: "Rate limit exceeded" }, { status: 429 });
+    }
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const targetUrl = searchParams.get('url');
 
