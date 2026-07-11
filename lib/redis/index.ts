@@ -3,16 +3,23 @@ import { Redis } from 'ioredis';
 // 1. Define a helper to create the client
 const redisClientSingleton = () => {
   const url = process.env.REDIS_URL;
+  let client: Redis;
   
   if (!url) {
     console.warn("REDIS_URL is missing. Falling back to local redis.");
-    return new Redis("redis://default:password@127.0.0.1:6379");
+    client = new Redis("redis://default:password@127.0.0.1:6379");
+  } else {
+    client = new Redis(url, {
+      maxRetriesPerRequest: 3
+    });
   }
 
-  return new Redis(url, {
-    // Optional: add retry strategy for better stability
-    maxRetriesPerRequest: 3
+  client.on("error", (err) => {
+    // Silently capture background connection issues instead of letting them bubble up as unhandled events
+    console.error("[Redis] Background connection error:", err.message);
   });
+
+  return client;
 };
 
 // 2. Attach the client to the global object in development

@@ -14,6 +14,14 @@ export const authOptions: AuthOptions = {
     }),
   ],
   callbacks: {
+    async signIn({ account }) {
+      if (account?.provider === "github") {
+        if (!process.env.GITHUB_ID || !process.env.GITHUB_SECRET) {
+          throw new Error("GitHub Authentication is not configured on this server. Please set GITHUB_ID and GITHUB_SECRET.");
+        }
+      }
+      return true;
+    },
     async jwt({ token, profile, account }: { token: JWT; account?: any; profile?: Profile }) {
       if (profile) {
         token.username = (profile as any).login;

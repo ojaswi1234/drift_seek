@@ -32,6 +32,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (typeof githubUrl !== "string" || !githubUrl.startsWith("https://github.com/")) {
+      return NextResponse.json(
+        { success: false, error: "Invalid githubUrl format. Must start with https://github.com/" },
+        { status: 400 }
+      );
+    }
+
     // Map single-process stress metrics into the ABTestLogs schema structure.
     // For single-process runs, we treat baseline and candidate metrics identically.
     const testData = {
@@ -53,17 +60,12 @@ export async function POST(req: NextRequest) {
       passed: metrics.successRate >= 95.0, // Mark as passed if success rate is at least 95%
     };
 
-    let logEntity = await ABTestLogs.findOne({ githubUrl });
-    if (!logEntity) {
-      logEntity = new ABTestLogs({
-        githubUrl,
-        abTests: [testData],
-      });
-    } else {
-      logEntity.abTests.push(testData);
-    }
-
-    await logEntity.save();
+    // Use atomic update with upsert: true to prevent duplicate logs race conditions
+    const logEntity = await ABTestLogs.findOneAndUpdate(
+      { githubUrl },
+      { $push: { abTests: testData } },
+      { upsert: true, new: true }
+    );
 
     console.log(`[PIPELINES CALLBACK] Successfully stored stress test data for ${githubUrl}`);
 
