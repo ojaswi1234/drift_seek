@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route"; 
 import { NextRequest, NextResponse } from "next/server";
+import { triggerABTestSchema } from "@/lib/validation/schemas";
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,11 +23,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { githubUrl, branches, buildCommand, startCommand } = await req.json();
-    
-    if (!githubUrl || !branches || branches.length !== 2) {
-      return NextResponse.json({ success: false, error: "Missing GitHub URL or specific branches (must be exactly 2)" }, { status: 400 });
+    const body = await req.json();
+    const validationResult = triggerABTestSchema.safeParse(body);
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { success: false, error: "Validation failed", errors: validationResult.error.issues },
+        { status: 400 }
+      );
     }
+
+    const { githubUrl, branches, buildCommand, startCommand } = validationResult.data;
 
     // Parse the github URL to get owner and repo
     // Example: https://github.com/ojaswi1234/drift_seek

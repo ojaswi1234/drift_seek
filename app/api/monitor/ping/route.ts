@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '../../../../lib/db_connect';
 import WebServer from '../../../../lib/models/WebServer';
 import redis from '@/lib/redis';
+import { pingMonitorSchema } from '@/lib/validation/schemas';
 
 
 async function calculateLatency(url: string): Promise<{ latency: number; status: 'up' | 'down'; reason: string }> {
@@ -39,11 +40,16 @@ export async function POST(req: Request) {
   try {
     await dbConnect();
     const body = await req.json();
-    const { id, url: reqUrl } = body;
 
-    if (!id && !reqUrl) {
-      return NextResponse.json({ error: 'Must provide id or url' }, { status: 400 });
+    const validationResult = pingMonitorSchema.safeParse(body);
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: "Validation failed", errors: validationResult.error.issues },
+        { status: 400 }
+      );
     }
+
+    const { id, url: reqUrl } = validationResult.data;
 
     let webServer;
     if (id) {
