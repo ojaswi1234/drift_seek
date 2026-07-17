@@ -6,51 +6,51 @@ import { NextResponse } from "next/server";
 
 export async function GET(req: Request): Promise<NextResponse> {
   try {
-    // 1. Authenticate the GET request
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user || !session.user.email) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const teamId = searchParams.get("teamId");
+    if (!teamId) {
+      return NextResponse.json({ message: "teamId is required" }, { status: 400 });
+    }
+
+    await dbConnect();
+    const users = await TeamUser.find({ teamId });
+    return NextResponse.json(
+      { members: users.map((user) => ({ userId: user.userId, role: user.role })) },
+      { status: 200 },
+    );
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Internal server error";
+    return NextResponse.json({ message }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request): Promise<NextResponse> {
+  try {
     const session = await getServerSession(authOptions);
     if (!session || !session.user || !session.user.email) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
     await dbConnect();
-    // 2. Fetch ONLY the servers owned by the logged-in user
-    const users = await TeamUser.find();
-    return NextResponse.json(
-      {
-        id: users.map((user) => user.userId),
-      },
-      { status: 201 },
-    );
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Internal server error";
-    return NextResponse.json({ message }, { status: 500 });
-    //console.log("Database is having some problems......");
-  }
-}
+    const { teamId, userId, role } = await req.json();
 
-export async function POST(req: Request): Promise<NextResponse> {
-  try {
-
-     const session = await getServerSession(authOptions);
-    if (!session || !session.user || !session.user.email) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    if (!teamId || !userId || !role) {
+      return NextResponse.json(
+        { message: "teamId, userId, and role are all required" },
+        { status: 400 },
+      );
     }
 
-    await dbConnect();
-    const { userId, user_role } = await req.json();
-
-    const newUser = new TeamUser({
-      userId,
-      user_role,
-    });
+    const newUser = new TeamUser({ teamId, userId, role });
     await newUser.save();
-    return NextResponse.json(
-      { message: "User saved successfully" },
-      { status: 201 },
-    );
+    return NextResponse.json({ message: "User saved successfully" }, { status: 201 });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Internal server error";
     return NextResponse.json({ message }, { status: 500 });
-    //console.log("Failed to save....");
   }
 }
