@@ -33,6 +33,7 @@ services:
     restart: unless-stopped
     ports:
       - "3001:3001"
+      - "50052:50052"
     environment:
       NODE_ENV: production
       PORT: 3001
@@ -44,6 +45,17 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  grpc-worker:
+    build:
+      context: .
+      dockerfile: grpc-worker/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "50051:50051"
+    environment:
+      NODE_ENV: production
+      PORT: 50051
 
   app:
     build:

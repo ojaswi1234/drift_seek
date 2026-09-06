@@ -4,14 +4,14 @@ import GithubProvider from "next-auth/providers/github"
 import { JWT } from "next-auth/jwt";
 
 if (!process.env.GITHUB_ID || !process.env.GITHUB_SECRET) {
-  throw new Error("GITHUB_ID and GITHUB_SECRET environment variables are not set.");
+  console.warn("WARNING: GITHUB_ID and GITHUB_SECRET environment variables are not set. Authentication will fail.");
 }
 
 export const authOptions: AuthOptions = {
   providers: [
     GithubProvider({
-      clientId: process.env.GITHUB_ID,
-      clientSecret: process.env.GITHUB_SECRET,
+      clientId: process.env.GITHUB_ID || "",
+      clientSecret: process.env.GITHUB_SECRET || "",
       authorization: { 
         params: { scope: 'read:user user:email repo workflow' } 
       },

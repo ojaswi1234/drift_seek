@@ -1,0 +1,19 @@
+{
+  "name": "grpc-worker",
+  "version": "1.0.0",
+  "description": "gRPC Worker for DriftSeeker",
+  "main": "server.js",
+  "scripts": {
+    "start": "ts-node server.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.10.8",
+    "@grpc/proto-loader": "^0.7.13"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
+  }
+}

@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package driftseeker.execution;
+
+service SandboxManager {
+  rpc RunStressTest (PipelineConfig) returns (stream LogChunk);
+}
+
+message PipelineConfig {
+  string github_url = 1;
+}
+
+message LogChunk {
+  string message = 1;
+}

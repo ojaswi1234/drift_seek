@@ -6,8 +6,61 @@ import dotenv from "dotenv";
 import path from 'path';
 import { execSync } from "child_process";
 import { exec } from "child_process";
+import * as grpc from '@grpc/grpc-js';
+import * as protoLoader from '@grpc/proto-loader';
 
 dotenv.config();
+
+// gRPC Setup
+const PROTO_PATH = path.resolve(__dirname, '../protos/execution.proto');
+const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
+  keepCase: true, longs: String, enums: String, defaults: true, oneofs: true
+});
+const protoDescriptor = grpc.loadPackageDefinition(packageDefinition) as any;
+const executionProto = protoDescriptor.driftseeker.execution;
+
+function startGrpcServer() {
+  const server = new grpc.Server();
+  
+  server.addService(executionProto.SandboxManager.service, {
+    RunStressTest: (call: any) => {
+      const { github_url } = call.request;
+      console.log(`[gRPC] RunStressTest requested for ${github_url}`);
+      
+      call.write({ message: `Starting pipeline for ${github_url}...` });
+      
+      const command = `docker run --rm --memory="256m" --cpus="0.5" node:alpine sh -c "apk add --no-cache git && npm install -g autocannon && git clone ${github_url} /temp_app && cd /temp_app && npm install --legacy-peer-deps && npm run build --if-present && (npm start &) && sleep 15 && autocannon -c 50 -a 2000 -j http://localhost:3000"`;
+      
+      const child = exec(command, { maxBuffer: 1024 * 1024 * 10 });
+      
+      child.stdout?.on('data', (data) => {
+        // Stream stdout to the client
+        const lines = data.toString().split('\n').filter(Boolean);
+        lines.forEach((line: string) => call.write({ message: line }));
+      });
+      
+      child.stderr?.on('data', (data) => {
+        const lines = data.toString().split('\n').filter(Boolean);
+        lines.forEach((line: string) => call.write({ message: `[ERROR] ${line}` }));
+      });
+      
+      child.on('close', (code) => {
+        call.write({ message: `Process exited with code ${code}` });
+        call.end();
+      });
+    }
+  });
+
+  const grpcPort = process.env.GRPC_PORT || '50052';
+  server.bindAsync(`0.0.0.0:${grpcPort}`, grpc.ServerCredentials.createInsecure(), (err, port) => {
+    if (err) {
+      console.error(err);
+      return;
+    }
+    console.log(`gRPC Execution Server running on port ${port}`);
+  });
+}
+
 
 const app = express();
 const httpServer = createServer(app);
@@ -20,6 +73,8 @@ const io = new Server(httpServer, {
 });
 
 function startServer() {
+  startGrpcServer();
+
   const targetContainer = "alpine:latest";
   
   console.log(`Pre-pulling ${targetContainer} to ensure clean terminal starts...`);
