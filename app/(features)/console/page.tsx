@@ -492,10 +492,15 @@ export default function Page() {
 
       <TeamRoomModal
         isOpen={showTeamModal}
+        teamId={sysName}
         memberIdInput={memberIdInput}
         onMemberIdChange={setMemberIdInput}
         memberRoleInput={memberRoleInput}
         onMemberRoleChange={setMemberRoleInput}
+        onMemberAdded={() => {
+          setMode("team");
+          setActiveRoomId(sysName);
+        }}
         onCancel={() => {
           setShowTeamModal(false);
           if (mode !== "team") setMode("individual");
