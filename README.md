@@ -33,7 +33,7 @@ It provides:
 
 The monitoring workflow image is included below from the public folder.
 
-![24/7 Monitoring Workflow](/public/realtime_monitoring_workflow.png)
+![24/7 Monitoring Workflow](./public/realtime_monitoring_workflow.png)
 
 ## Project Structure (Important Areas)
 
@@ -110,7 +110,7 @@ This will start:
 
 App URL: http://localhost:3000
 
-App URL: http://localhost:3000
+
 
 ## Available Scripts
 
