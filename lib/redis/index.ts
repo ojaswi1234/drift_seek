@@ -5,13 +5,20 @@ const redisClientSingleton = () => {
   const url = process.env.REDIS_URL;
   
   if (!url) {
-    console.warn("REDIS_URL is missing. Falling back to local redis.");
-    return new Redis("redis://default:password@127.0.0.1:6379");
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('REDIS_URL environment variable is required in production');
+    }
+    console.warn("REDIS_URL is missing. Falling back to local redis (development only).");
+    return new Redis("redis://127.0.0.1:6379");
   }
 
   return new Redis(url, {
     // Optional: add retry strategy for better stability
-    maxRetriesPerRequest: 3
+    maxRetriesPerRequest: 3,
+    // Connection timeout
+    connectTimeout: 10000,
+    // Enable lazy connect
+    lazyConnect: true,
   });
 };
 
