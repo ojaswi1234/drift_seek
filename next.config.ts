@@ -5,8 +5,8 @@ const nextConfig: NextConfig = {
     styledComponents: true,
   },
  
-    allowedDevOrigins: ['3000-firebase-driftseekgit-1775514209589.cluster-sumfw3zmzzhzkx4mpvz3ogth4y.cloudworkstations.dev'],
-    
+  allowedDevOrigins: ['3000-firebase-driftseekgit-1775514209589.cluster-sumfw3zmzzhzkx4mpvz3ogth4y.cloudworkstations.dev'],
+  
   images: {
     remotePatterns: [
       {
@@ -19,7 +19,69 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-   turbopack: {},
+  
+  turbopack: {},
+  
+  // Security headers
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          // Content Security Policy
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://apis.google.com",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "font-src 'self' https://fonts.gstatic.com",
+              "img-src 'self' data: https: blob:",
+              "connect-src 'self' https://api.github.com wss: ws:",
+              "frame-ancestors 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+            ].join('; '),
+          },
+          // HTTP Strict Transport Security
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains; preload',
+          },
+          // Prevent clickjacking
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          // Prevent MIME type sniffing
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          // Referrer policy
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+          // Permissions policy
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()',
+          },
+          // Cross-Origin policies
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin',
+          },
+          {
+            key: 'Cross-Origin-Resource-Policy',
+            value: 'same-origin',
+          },
+        ],
+      },
+    ];
+  },
+  
   webpack: (config) => {
     config.externals.push({
       express: "commonjs express",

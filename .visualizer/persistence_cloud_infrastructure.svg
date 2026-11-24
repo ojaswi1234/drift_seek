@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1347" height="667" style="background:#1E1E22">
+<defs>
+  <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+    <polygon points="0 1, 8 4, 0 7" fill="#6488C8"/>
+  </marker>
+  <marker id="arrow-rev" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+    <polygon points="0 1, 8 4, 0 7" fill="#505060"/>
+  </marker>
+  <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+    <feDropShadow dx="2" dy="3" stdDeviation="3" flood-color="#000000" flood-opacity="0.5"/>
+  </filter>
+</defs>
+<text x="674" y="28" font-family="monospace" font-size="16" font-weight="bold" fill="#A0B4E8" text-anchor="middle">Persistence &amp; Cloud Infrastructure</text>
+<text x="674" y="46" font-family="monospace" font-size="11" fill="#7085A8" text-anchor="middle">Interconnectivity Mesh: 12 nodes, 20 links (1.7x density)</text>
+<path d="M281.0,468.0 V508.0 H1085.2 V474.0" fill="none" stroke="#78829B" stroke-width="1.5" marker-end="url(#arrow)" data-from="terraform_iac" data-to="docker_engine" data-type="inject"/>
+<rect x="610.1" y="518.0" width="146" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="683.1" y="530.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Provision containers</text>
+<path d="M166.0,468.0 V522.0 H446.8 V474.0" fill="none" stroke="#78829B" stroke-width="1.5" marker-end="url(#arrow)" data-from="terraform_iac" data-to="mongodb_cluster" data-type="inject"/>
+<rect x="240.4" y="532.0" width="132" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="306.4" y="544.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Create DB instance</text>
+<path d="M223.5,468.0 V536.0 H746.8 V474.0" fill="none" stroke="#78829B" stroke-width="1.5" marker-end="url(#arrow)" data-from="terraform_iac" data-to="redis_cluster" data-type="inject"/>
+<rect x="408.7" y="546.0" width="153" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="485.2" y="558.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Create cache instance</text>
+<path d="M217.3,607.0 V615.0 H1274.5 V372.0 H1046.8 V378.0" fill="none" stroke="#4B9BE8" stroke-width="1.5" marker-end="url(#arrow)" data-from="github_actions_ci" data-to="docker_engine" data-type="http"/>
+<rect x="1198.0" y="491.5" width="125" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="1260.5" y="503.5" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Deploy containers</text>
+<path d="M138.7,607.0 V615.0 H524.5 V194.0 H373.5 V200.0" fill="none" stroke="#4B9BE8" stroke-width="1.5" marker-end="url(#arrow)" data-from="github_actions_ci" data-to="vercel_deploy" data-type="http"/>
+<rect x="455.0" y="402.5" width="111" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="510.5" y="414.5" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Deploy frontend</text>
+<path d="M1100.5,468.0 V550.0 H600.2 V474.0" fill="none" stroke="#646E82" stroke-width="1.5" marker-end="url(#arrow)" data-from="docker_engine" data-to="mongodb_cluster" data-type="mongo"/>
+<rect x="773.8" y="560.0" width="153" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="850.3" y="572.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Connect (MongoDB URI)</text>
+<path d="M1192.5,468.0 V564.0 H900.2 V474.0" fill="none" stroke="#EBA53C" stroke-width="1.5" marker-end="url(#arrow)" data-from="docker_engine" data-to="redis_cluster" data-type="cache"/>
+<rect x="976.8" y="574.0" width="139" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="1046.3" y="586.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Connect (Redis URL)</text>
+<path d="M1146.5,468.0 V476.0 H1274.5 V194.0 H673.5 V200.0" fill="none" stroke="#646E82" stroke-width="1.5" marker-end="url(#arrow)" data-from="docker_engine" data-to="s3_storage" data-type="storage"/>
+<rect x="1201.5" y="333.0" width="118" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="1260.5" y="345.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Upload artifacts</text>
+<path d="M1054.5,468.0 V511.0 H481.0 V517.0" fill="none" stroke="#78829B" stroke-width="1.5" marker-end="url(#arrow)" data-from="docker_engine" data-to="config_server" data-type="inject"/>
+<rect x="812.3" y="503.0" width="83" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="853.8" y="515.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Load config</text>
+<path d="M442.7,607.0 V615.0 H692.5 V372.0 H485.2 V378.0" fill="none" stroke="#78829B" stroke-width="1.5" marker-end="url(#arrow)" data-from="config_server" data-to="mongodb_cluster" data-type="inject"/>
+<rect x="605.5" y="491.5" width="146" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="678.5" y="503.5" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Config DB connection</text>
+<path d="M519.3,607.0 V615.0 H1010.5 V372.0 H785.2 V378.0" fill="none" stroke="#78829B" stroke-width="1.5" marker-end="url(#arrow)" data-from="config_server" data-to="redis_cluster" data-type="inject"/>
+<rect x="913.0" y="491.5" width="167" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="996.5" y="503.5" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Config cache connection</text>
+<path d="M935.2,290.0 V511.0 H138.7 V517.0" fill="none" stroke="#78829B" stroke-width="1.5" marker-end="url(#arrow)" data-from="secrets_manager" data-to="github_actions_ci" data-type="inject"/>
+<rect x="604.4" y="503.0" width="104" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="656.4" y="515.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Inject secrets</text>
+<path d="M1011.8,290.0 V372.0 H1161.8 V378.0" fill="none" stroke="#78829B" stroke-width="1.5" marker-end="url(#arrow)" data-from="secrets_manager" data-to="docker_engine" data-type="inject"/>
+<rect x="1012.3" y="364.0" width="104" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="1064.3" y="376.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Inject secrets</text>
+<path d="M634.2,144.0 V300.0 H523.5 V378.0" fill="none" stroke="#646E82" stroke-width="1.5" marker-end="url(#arrow)" data-from="monitoring_dashboard" data-to="mongodb_cluster" data-type="mongo"/>
+<rect x="557.4" y="292.0" width="76" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="595.4" y="304.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Query logs</text>
+<path d="M712.8,144.0 V372.0 H823.5 V378.0" fill="none" stroke="#EBA53C" stroke-width="1.5" marker-end="url(#arrow)" data-from="monitoring_dashboard" data-to="redis_cluster" data-type="cache"/>
+<rect x="736.3" y="364.0" width="97" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="784.8" y="376.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Query metrics</text>
+<path d="M906.8,607.0 V615.0 H1328.5 V372.0 H1123.5 V378.0" fill="none" stroke="#78829B" stroke-width="1.5" marker-end="url(#arrow)" data-from="docker_compose_orchestrator" data-to="docker_engine" data-type="inject"/>
+<rect x="1241.5" y="491.5" width="146" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="1314.5" y="503.5" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Orchestrate services</text>
+<path d="M746.2,607.0 V615.0 H1095.0 V372.0 H561.8 V378.0" fill="none" stroke="#78829B" stroke-width="1.5" marker-end="url(#arrow)" data-from="docker_compose_orchestrator" data-to="mongodb_cluster" data-type="inject"/>
+<rect x="1025.5" y="491.5" width="111" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="1081.0" y="503.5" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Network connect</text>
+<path d="M826.5,607.0 V615.0 H1113.0 V372.0 H861.8 V378.0" fill="none" stroke="#78829B" stroke-width="1.5" marker-end="url(#arrow)" data-from="docker_compose_orchestrator" data-to="redis_cluster" data-type="inject"/>
+<rect x="1043.5" y="491.5" width="111" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="1099.0" y="503.5" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Network connect</text>
+<path d="M1133.7,607.0 V647.0 H217.3 V613.0" fill="none" stroke="#4B9BE8" stroke-width="1.5" marker-end="url(#arrow)" data-from="ci_cd_pipeline" data-to="github_actions_ci" data-type="http"/>
+<rect x="623.5" y="657.0" width="104" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="675.5" y="669.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Trigger CI run</text>
+<path d="M1210.3,607.0 V615.0 H1431.0 V372.0 H1200.2 V378.0" fill="none" stroke="#78829B" stroke-width="1.5" marker-end="url(#arrow)" data-from="ci_cd_pipeline" data-to="docker_engine" data-type="inject"/>
+<rect x="1344.0" y="491.5" width="146" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="1417.0" y="503.5" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Start local services</text>
+<g id="node-mongodb_cluster" data-id="mongodb_cluster" data-tier="persistence" data-tech="MongoDB Atlas">
+<rect x="408.5" y="384.0" width="230" height="84" rx="4" ry="4" fill="#2D914B" filter="url(#shadow)"/>
+<rect x="408.5" y="384.0" width="230" height="3" rx="2" ry="2" fill="#DCE6FF"/>
+<rect x="408.0" y="383.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#8CA5E0" stroke-width="2" opacity="0.7"/>
+<text x="523.5" y="401.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[DATABASE]</text>
+<text x="523.5" y="422.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">MongoDB Cluster</text>
+<rect x="470.0" y="433.0" width="107.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="523.5" y="446.0" font-family="monospace" font-size="10" fill="#45B868" text-anchor="middle">MongoDB Atlas</text>
+<title>MongoDB Cluster
+Tier: PERSISTENCE
+Tech: MongoDB Atlas
+Role: Managed document database
+[Managed Cloud / External Service]</title>
+</g>
+<g id="node-redis_cluster" data-id="redis_cluster" data-tier="persistence" data-tech="Redis Enterprise">
+<rect x="708.5" y="384.0" width="230" height="84" rx="4" ry="4" fill="#D2821E" filter="url(#shadow)"/>
+<rect x="708.5" y="384.0" width="230" height="3" rx="2" ry="2" fill="#DCE6FF"/>
+<rect x="708.0" y="383.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#8CA5E0" stroke-width="2" opacity="0.7"/>
+<text x="823.5" y="401.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[CACHE]</text>
+<text x="823.5" y="422.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Redis Cluster</text>
+<rect x="759.5" y="433.0" width="128.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="823.5" y="446.0" font-family="monospace" font-size="10" fill="#EAA03C" text-anchor="middle">Redis Enterprise</text>
+<title>Redis Cluster
+Tier: PERSISTENCE
+Tech: Redis Enterprise
+Role: Managed in‑memory cache
+[Managed Cloud / External Service]</title>
+</g>
+<g id="node-docker_engine" data-id="docker_engine" data-tier="infrastructure" data-tech="Docker">
+<rect x="1008.5" y="384.0" width="230" height="84" rx="4" ry="4" fill="#1E8C9E" filter="url(#shadow)"/>
+<rect x="1008.5" y="384.0" width="230" height="3" rx="2" ry="2" fill="#30ABC0"/>
+<rect x="1008.0" y="383.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#30ABC0" stroke-width="1" opacity="0.7"/>
+<text x="1123.5" y="401.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[SERVICE]</text>
+<text x="1123.5" y="422.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Docker Engine</text>
+<rect x="1093.5" y="433.0" width="60.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="1123.5" y="446.0" font-family="monospace" font-size="10" fill="#30ABC0" text-anchor="middle">Docker</text>
+<title>Docker Engine
+Tier: INFRASTRUCTURE
+Tech: Docker
+Role: Runs containers for app, DB, cache, workers</title>
+</g>
+<g id="node-terraform_iac" data-id="terraform_iac" data-tier="infrastructure" data-tech="Terraform">
+<rect x="108.5" y="384.0" width="230" height="84" rx="4" ry="4" fill="#484858" filter="url(#shadow)"/>
+<rect x="108.5" y="384.0" width="230" height="3" rx="2" ry="2" fill="#686878"/>
+<rect x="108.0" y="383.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#686878" stroke-width="1" opacity="0.7"/>
+<text x="223.5" y="401.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[INFRASTRUCTURE]</text>
+<text x="223.5" y="422.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Terraform IaC</text>
+<rect x="184.0" y="433.0" width="79.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="223.5" y="446.0" font-family="monospace" font-size="10" fill="#686878" text-anchor="middle">Terraform</text>
+<title>Terraform IaC
+Tier: INFRASTRUCTURE
+Tech: Terraform
+Role: Provisions cloud resources</title>
+</g>
+<g id="node-github_actions_ci" data-id="github_actions_ci" data-tier="infrastructure" data-tech="GitHub Actions">
+<rect x="60.0" y="523.0" width="236" height="84" rx="4" ry="4" fill="#464BAF" filter="url(#shadow)"/>
+<rect x="60.0" y="523.0" width="236" height="3" rx="2" ry="2" fill="#DCE6FF"/>
+<rect x="59.5" y="522.5" width="237" height="85" rx="4" ry="4" fill="none" stroke="#8CA5E0" stroke-width="2" opacity="0.7"/>
+<text x="178.0" y="540.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[CLOUD]</text>
+<text x="178.0" y="561.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">GitHub Actions CI/CD</text>
+<rect x="121.0" y="572.0" width="114.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="178.0" y="585.0" font-family="monospace" font-size="10" fill="#646CD2" text-anchor="middle">GitHub Actions</text>
+<title>GitHub Actions CI/CD
+Tier: INFRASTRUCTURE
+Tech: GitHub Actions
+Role: Builds and deploys services
+[Managed Cloud / External Service]</title>
+</g>
+<g id="node-vercel_deploy" data-id="vercel_deploy" data-tier="integration" data-tech="Vercel">
+<rect x="258.5" y="206.0" width="230" height="84" rx="4" ry="4" fill="#464BAF" filter="url(#shadow)"/>
+<rect x="258.5" y="206.0" width="230" height="3" rx="2" ry="2" fill="#DCE6FF"/>
+<rect x="258.0" y="205.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#8CA5E0" stroke-width="2" opacity="0.7"/>
+<text x="373.5" y="223.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[CLOUD]</text>
+<text x="373.5" y="244.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Vercel Deploy</text>
+<rect x="343.5" y="255.0" width="60.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="373.5" y="268.0" font-family="monospace" font-size="10" fill="#646CD2" text-anchor="middle">Vercel</text>
+<title>Vercel Deploy
+Tier: INTEGRATION
+Tech: Vercel
+Role: Hosts Next.js frontend
+[Managed Cloud / External Service]</title>
+</g>
+<g id="node-s3_storage" data-id="s3_storage" data-tier="integration" data-tech="AWS S3">
+<rect x="558.5" y="206.0" width="230" height="84" rx="4" ry="4" fill="#505A69" filter="url(#shadow)"/>
+<rect x="558.5" y="206.0" width="230" height="3" rx="2" ry="2" fill="#DCE6FF"/>
+<rect x="558.0" y="205.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#8CA5E0" stroke-width="2" opacity="0.7"/>
+<text x="673.5" y="223.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[STORAGE]</text>
+<text x="673.5" y="244.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">S3 Object Storage</text>
+<rect x="643.5" y="255.0" width="60.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="673.5" y="268.0" font-family="monospace" font-size="10" fill="#738094" text-anchor="middle">AWS S3</text>
+<title>S3 Object Storage
+Tier: INTEGRATION
+Tech: AWS S3
+Role: Stores static assets &amp; backups
+[Managed Cloud / External Service]</title>
+</g>
+<g id="node-secrets_manager" data-id="secrets_manager" data-tier="integration" data-tech="AWS Secrets Manager">
+<rect x="858.5" y="206.0" width="230" height="84" rx="4" ry="4" fill="#464BAF" filter="url(#shadow)"/>
+<rect x="858.5" y="206.0" width="230" height="3" rx="2" ry="2" fill="#DCE6FF"/>
+<rect x="858.0" y="205.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#8CA5E0" stroke-width="2" opacity="0.7"/>
+<text x="973.5" y="223.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[CLOUD]</text>
+<text x="973.5" y="244.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Secrets Manager</text>
+<rect x="899.0" y="255.0" width="149.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="973.5" y="268.0" font-family="monospace" font-size="10" fill="#646CD2" text-anchor="middle">AWS Secrets Manager</text>
+<title>Secrets Manager
+Tier: INTEGRATION
+Tech: AWS Secrets Manager
+Role: Provides env secrets to CI/CD and runtime
+[Managed Cloud / External Service]</title>
+</g>
+<g id="node-config_server" data-id="config_server" data-tier="infrastructure" data-tech="Node.js">
+<rect x="366.0" y="523.0" width="230" height="84" rx="4" ry="4" fill="#1E8C9E" filter="url(#shadow)"/>
+<rect x="366.0" y="523.0" width="230" height="3" rx="2" ry="2" fill="#30ABC0"/>
+<rect x="365.5" y="522.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#30ABC0" stroke-width="1" opacity="0.7"/>
+<text x="481.0" y="540.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[SERVICE]</text>
+<text x="481.0" y="561.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Config Server</text>
+<rect x="448.5" y="572.0" width="65.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="481.0" y="585.0" font-family="monospace" font-size="10" fill="#30ABC0" text-anchor="middle">Node.js</text>
+<title>Config Server
+Tier: INFRASTRUCTURE
+Tech: Node.js
+Role: Central configuration provider
+File: config/serverConfig.ts:1</title>
+</g>
+<g id="node-monitoring_dashboard" data-id="monitoring_dashboard" data-tier="application" data-tech="Grafana">
+<rect x="555.5" y="60.0" width="236" height="84" rx="4" ry="4" fill="#484858" filter="url(#shadow)"/>
+<rect x="555.5" y="60.0" width="236" height="3" rx="2" ry="2" fill="#686878"/>
+<rect x="555.0" y="59.5" width="237" height="85" rx="4" ry="4" fill="none" stroke="#686878" stroke-width="1" opacity="0.7"/>
+<text x="673.5" y="77.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[TOOL]</text>
+<text x="673.5" y="98.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Monitoring Dashboard</text>
+<rect x="641.0" y="109.0" width="65.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="673.5" y="122.0" font-family="monospace" font-size="10" fill="#686878" text-anchor="middle">Grafana</text>
+<title>Monitoring Dashboard
+Tier: APPLICATION
+Tech: Grafana
+Role: Visualizes metrics from Redis &amp; MongoDB</title>
+</g>
+<g id="node-docker_compose_orchestrator" data-id="docker_compose_orchestrator" data-tier="infrastructure" data-tech="Docker Compose">
+<rect x="666.0" y="523.0" width="321" height="84" rx="4" ry="4" fill="#484858" filter="url(#shadow)"/>
+<rect x="666.0" y="523.0" width="321" height="3" rx="2" ry="2" fill="#686878"/>
+<rect x="665.5" y="522.5" width="322" height="85" rx="4" ry="4" fill="none" stroke="#686878" stroke-width="1" opacity="0.7"/>
+<text x="826.5" y="540.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[ORCHESTRATOR]</text>
+<text x="826.5" y="561.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Docker‑Compose Orchestr...</text>
+<rect x="769.5" y="572.0" width="114.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="826.5" y="585.0" font-family="monospace" font-size="10" fill="#686878" text-anchor="middle">Docker Compose</text>
+<title>Docker‑Compose Orchestrator
+Tier: INFRASTRUCTURE
+Tech: Docker Compose
+Role: Defines service topology and health‑checks</title>
+</g>
+<g id="node-ci_cd_pipeline" data-id="ci_cd_pipeline" data-tier="infrastructure" data-tech="Bash|npm">
+<rect x="1057.0" y="523.0" width="230" height="84" rx="4" ry="4" fill="#1E8C9E" filter="url(#shadow)"/>
+<rect x="1057.0" y="523.0" width="230" height="3" rx="2" ry="2" fill="#30ABC0"/>
+<rect x="1056.5" y="522.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#30ABC0" stroke-width="1" opacity="0.7"/>
+<text x="1172.0" y="540.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[SERVICE]</text>
+<text x="1172.0" y="561.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">CI/CD Pipeline</text>
+<rect x="1136.0" y="572.0" width="72.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="1172.0" y="585.0" font-family="monospace" font-size="10" fill="#30ABC0" text-anchor="middle">Bash|npm</text>
+<title>CI/CD Pipeline
+Tier: INFRASTRUCTURE
+Tech: Bash|npm
+Role: Runs tests, builds, and pushes images
+File: scripts/ci.sh:1</title>
+</g>
+<text x="8" y="647" font-family="monospace" font-size="9" fill="#404858">Generated by AI Project Visualizer</text>
+</svg>

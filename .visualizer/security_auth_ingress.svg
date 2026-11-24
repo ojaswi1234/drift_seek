@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="950" height="1377" style="background:#1E1E22">
+<defs>
+  <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+    <polygon points="0 1, 8 4, 0 7" fill="#6488C8"/>
+  </marker>
+  <marker id="arrow-rev" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+    <polygon points="0 1, 8 4, 0 7" fill="#505060"/>
+  </marker>
+  <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+    <feDropShadow dx="2" dy="3" stdDeviation="3" flood-color="#000000" flood-opacity="0.5"/>
+  </filter>
+</defs>
+<text x="475" y="28" font-family="monospace" font-size="16" font-weight="bold" fill="#A0B4E8" text-anchor="middle">Security, Auth &amp; Ingress</text>
+<text x="475" y="46" font-family="monospace" font-size="11" fill="#7085A8" text-anchor="middle">Interconnectivity Mesh: 11 nodes, 18 links (1.6x density)</text>
+<path d="M475.0,144.0 V187.0 H475.0 V193.0" fill="none" stroke="#4B9BE8" stroke-width="1.5" marker-end="url(#arrow)" data-from="cloud_lb" data-to="waf" data-type="http"/>
+<rect x="426.5" y="179.0" width="97" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="475.0" y="191.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">HTTPS traffic</text>
+<path d="M429.3,283.0 V333.0 H475.0 V339.0" fill="none" stroke="#4B9BE8" stroke-width="1.5" marker-end="url(#arrow)" data-from="waf" data-to="frontend" data-type="http"/>
+<rect x="389.8" y="325.0" width="111" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="445.3" y="337.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Forward request</text>
+<path d="M417.5,429.0 V487.7 H325.0 V517.0" fill="none" stroke="#DC5050" stroke-width="1.5" marker-end="url(#arrow)" data-from="frontend" data-to="nextauth_provider" data-type="auth"/>
+<rect x="333.1" y="479.7" width="104" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="385.1" y="491.7" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">OAuth redirect</text>
+<path d="M325.0,607.0 V869.7 H436.7 V1001.0" fill="none" stroke="#DC5050" stroke-width="1.5" marker-end="url(#arrow)" data-from="nextauth_provider" data-to="jwt_issuer" data-type="auth"/>
+<rect x="329.6" y="861.7" width="69" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="364.1" y="873.7" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Issue JWT</text>
+<path d="M436.7,1091.0 V1162.0 H349.5 V1227.0" fill="none" stroke="#EBA53C" stroke-width="1.5" marker-end="url(#arrow)" data-from="jwt_issuer" data-to="session_store" data-type="cache"/>
+<rect x="357.7" y="1154.0" width="97" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="406.2" y="1166.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Store session</text>
+<path d="M532.5,429.0 V511.0 H647.0 V517.0" fill="none" stroke="#4B9BE8" stroke-width="1.5" marker-end="url(#arrow)" data-from="frontend" data-to="api_gateway" data-type="http"/>
+<rect x="558.4" y="503.0" width="97" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="606.9" y="515.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">HTTP API call</text>
+<path d="M589.5,607.0 V721.0 H475.0 V727.0" fill="none" stroke="#DC5050" stroke-width="1.5" marker-end="url(#arrow)" data-from="api_gateway" data-to="auth_middleware" data-type="auth"/>
+<rect x="504.4" y="713.0" width="90" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="549.4" y="725.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Validate JWT</text>
+<path d="M475.0,817.0 V895.4 H513.3 V1001.0" fill="none" stroke="#DC5050" stroke-width="1.5" marker-end="url(#arrow)" data-from="auth_middleware" data-to="jwt_issuer" data-type="auth"/>
+<rect x="443.4" y="887.4" width="90" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="488.4" y="899.4" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Verify token</text>
+<path d="M398.3,817.0 V928.6 H175.0 V1001.0" fill="none" stroke="#DC5050" stroke-width="1.5" marker-end="url(#arrow)" data-from="auth_middleware" data-to="role_guard" data-type="auth"/>
+<rect x="201.2" y="920.6" width="104" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="253.2" y="932.6" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Authorize role</text>
+<path d="M175.0,1091.0 V1191.5 H251.5 V1227.0" fill="none" stroke="#EBA53C" stroke-width="1.5" marker-end="url(#arrow)" data-from="role_guard" data-to="session_store" data-type="cache"/>
+<rect x="162.2" y="1183.5" width="125" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="224.7" y="1195.5" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Read session data</text>
+<path d="M513.3,817.0 V961.8 H717.5 V1001.0" fill="none" stroke="#DC5050" stroke-width="1.5" marker-end="url(#arrow)" data-from="auth_middleware" data-to="csrf_protector" data-type="auth"/>
+<rect x="499.2" y="953.8" width="118" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="558.2" y="965.8" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Apply CSRF check</text>
+<path d="M647.0,607.0 V1221.0 H690.0 V1227.0" fill="none" stroke="#646E82" stroke-width="1.5" marker-end="url(#arrow)" data-from="api_gateway" data-to="audit_logger" data-type="log"/>
+<rect x="620.5" y="1213.0" width="83" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="662.0" y="1225.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Log request</text>
+<path d="M436.7,817.0 V1221.0 H300.5 V1227.0" fill="none" stroke="#EBA53C" stroke-width="1.5" marker-end="url(#arrow)" data-from="auth_middleware" data-to="session_store" data-type="cache"/>
+<rect x="344.0" y="1213.0" width="90" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="389.0" y="1225.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Session read</text>
+<path d="M513.3,1091.0 V1221.0 H632.5 V1227.0" fill="none" stroke="#646E82" stroke-width="1.5" marker-end="url(#arrow)" data-from="jwt_issuer" data-to="audit_logger" data-type="log"/>
+<rect x="473.5" y="1213.0" width="132" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="539.5" y="1225.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Log token issuance</text>
+<path d="M520.7,283.0 V1221.0 H575.0 V1227.0" fill="none" stroke="#646E82" stroke-width="1.5" marker-end="url(#arrow)" data-from="waf" data-to="audit_logger" data-type="log"/>
+<rect x="487.7" y="1213.0" width="104" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="539.7" y="1225.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Log WAF events</text>
+<path d="M475.0,429.0 V1221.0 H398.5 V1227.0" fill="none" stroke="#EBA53C" stroke-width="1.5" marker-end="url(#arrow)" data-from="frontend" data-to="session_store" data-type="cache"/>
+<rect x="378.7" y="1213.0" width="139" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="448.2" y="1225.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Read session cookie</text>
+<path d="M704.5,607.0 V995.0 H832.5 V1001.0" fill="none" stroke="#DC5050" stroke-width="1.5" marker-end="url(#arrow)" data-from="api_gateway" data-to="csrf_protector" data-type="auth"/>
+<rect x="721.7" y="987.0" width="132" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="787.7" y="999.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Enforce CSRF token</text>
+<path d="M551.7,817.0 V995.0 H775.0 V1001.0" fill="none" stroke="#505060" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrow-rev)" data-from="auth_middleware" data-to="csrf_protector" data-type="auth"/>
+<rect x="666.9" y="987.0" width="118" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="725.9" y="999.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Pass after check</text>
+<g id="node-cloud_lb" data-id="cloud_lb" data-tier="ingress" data-tech="AWS ELB|GCP LB">
+<rect x="360.0" y="60.0" width="230" height="84" rx="4" ry="4" fill="#2369BE" filter="url(#shadow)"/>
+<rect x="360.0" y="60.0" width="230" height="3" rx="2" ry="2" fill="#DCE6FF"/>
+<rect x="359.5" y="59.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#8CA5E0" stroke-width="2" opacity="0.7"/>
+<text x="475.0" y="77.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[GATEWAY]</text>
+<text x="475.0" y="98.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Cloud Load Balancer</text>
+<rect x="418.0" y="109.0" width="114.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="475.0" y="122.0" font-family="monospace" font-size="10" fill="#3B8CE8" text-anchor="middle">AWS ELB|GCP LB</text>
+<title>Cloud Load Balancer
+Tier: INGRESS
+Tech: AWS ELB|GCP LB
+Role: Distributes inbound traffic
+[Managed Cloud / External Service]</title>
+</g>
+<g id="node-waf" data-id="waf" data-tier="ingress" data-tech="AWS WAF|Cloudflare">
+<rect x="338.0" y="199.0" width="274" height="84" rx="4" ry="4" fill="#B98719" filter="url(#shadow)"/>
+<rect x="338.0" y="199.0" width="274" height="3" rx="2" ry="2" fill="#DCE6FF"/>
+<rect x="337.5" y="198.5" width="275" height="85" rx="4" ry="4" fill="none" stroke="#8CA5E0" stroke-width="2" opacity="0.7"/>
+<text x="475.0" y="216.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[MIDDLEWARE]</text>
+<text x="475.0" y="237.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Web Application Firewall</text>
+<rect x="404.0" y="248.0" width="142.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="475.0" y="261.0" font-family="monospace" font-size="10" fill="#D7A532" text-anchor="middle">AWS WAF|Cloudflare</text>
+<title>Web Application Firewall
+Tier: INGRESS
+Tech: AWS WAF|Cloudflare
+Role: Filters malicious requests
+[Managed Cloud / External Service]</title>
+</g>
+<g id="node-frontend" data-id="frontend" data-tier="application" data-tech="Next.js|React">
+<rect x="360.0" y="345.0" width="230" height="84" rx="4" ry="4" fill="#1E8C9E" filter="url(#shadow)"/>
+<rect x="360.0" y="345.0" width="230" height="3" rx="2" ry="2" fill="#30ABC0"/>
+<rect x="359.5" y="344.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#30ABC0" stroke-width="1" opacity="0.7"/>
+<text x="475.0" y="362.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[SERVICE]</text>
+<text x="475.0" y="383.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Next.js Frontend</text>
+<rect x="421.5" y="394.0" width="107.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="475.0" y="407.0" font-family="monospace" font-size="10" fill="#30ABC0" text-anchor="middle">Next.js|React</text>
+<title>Next.js Frontend
+Tier: APPLICATION
+Tech: Next.js|React
+Role: Serves UI pages
+File: app/layout.tsx:1</title>
+</g>
+<g id="node-nextauth_provider" data-id="nextauth_provider" data-tier="integration" data-tech="NextAuth|GitHub OAuth">
+<rect x="188.0" y="523.0" width="274" height="84" rx="4" ry="4" fill="#BE3232" filter="url(#shadow)"/>
+<rect x="188.0" y="523.0" width="274" height="3" rx="2" ry="2" fill="#DC5050"/>
+<rect x="187.5" y="522.5" width="275" height="85" rx="4" ry="4" fill="none" stroke="#DC5050" stroke-width="1" opacity="0.7"/>
+<text x="325.0" y="540.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[AUTH]</text>
+<text x="325.0" y="561.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">NextAuth GitHub Provider</text>
+<rect x="243.5" y="572.0" width="163.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="325.0" y="585.0" font-family="monospace" font-size="10" fill="#DC5050" text-anchor="middle">NextAuth|GitHub OAuth</text>
+<title>NextAuth GitHub Provider
+Tier: INTEGRATION
+Tech: NextAuth|GitHub OAuth
+Role: Handles OAuth flow
+File: pages/api/auth/[...nextauth].ts:1</title>
+</g>
+<g id="node-jwt_issuer" data-id="jwt_issuer" data-tier="integration" data-tech="jsonwebtoken">
+<rect x="360.0" y="1007.0" width="230" height="84" rx="4" ry="4" fill="#BE3232" filter="url(#shadow)"/>
+<rect x="360.0" y="1007.0" width="230" height="3" rx="2" ry="2" fill="#DC5050"/>
+<rect x="359.5" y="1006.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#DC5050" stroke-width="1" opacity="0.7"/>
+<text x="475.0" y="1024.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[AUTH]</text>
+<text x="475.0" y="1045.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">JWT Issuer</text>
+<rect x="425.0" y="1056.0" width="100.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="475.0" y="1069.0" font-family="monospace" font-size="10" fill="#DC5050" text-anchor="middle">jsonwebtoken</text>
+<title>JWT Issuer
+Tier: INTEGRATION
+Tech: jsonwebtoken
+Role: Creates and validates JWTs
+File: utils/jwt.ts:1</title>
+</g>
+<g id="node-session_store" data-id="session_store" data-tier="persistence" data-tech="Redis">
+<rect x="202.5" y="1233.0" width="245" height="84" rx="4" ry="4" fill="#D2821E" filter="url(#shadow)"/>
+<rect x="202.5" y="1233.0" width="245" height="3" rx="2" ry="2" fill="#DCE6FF"/>
+<rect x="202.0" y="1232.5" width="246" height="85" rx="4" ry="4" fill="none" stroke="#8CA5E0" stroke-width="2" opacity="0.7"/>
+<text x="325.0" y="1250.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[CACHE]</text>
+<text x="325.0" y="1271.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Session Store (Redis)</text>
+<rect x="295.0" y="1282.0" width="60.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="325.0" y="1295.0" font-family="monospace" font-size="10" fill="#EAA03C" text-anchor="middle">Redis</text>
+<title>Session Store (Redis)
+Tier: PERSISTENCE
+Tech: Redis
+Role: Keeps short‑lived session data
+[Managed Cloud / External Service]</title>
+</g>
+<g id="node-auth_middleware" data-id="auth_middleware" data-tier="application" data-tech="JWT|NextAuth">
+<rect x="360.0" y="733.0" width="230" height="84" rx="4" ry="4" fill="#B98719" filter="url(#shadow)"/>
+<rect x="360.0" y="733.0" width="230" height="3" rx="2" ry="2" fill="#D7A532"/>
+<rect x="359.5" y="732.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#D7A532" stroke-width="1" opacity="0.7"/>
+<text x="475.0" y="750.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[MIDDLEWARE]</text>
+<text x="475.0" y="771.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Auth Middleware</text>
+<rect x="425.0" y="782.0" width="100.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="475.0" y="795.0" font-family="monospace" font-size="10" fill="#D7A532" text-anchor="middle">JWT|NextAuth</text>
+<title>Auth Middleware
+Tier: APPLICATION
+Tech: JWT|NextAuth
+Role: Validates JWT on each request
+File: middleware/auth.ts:1</title>
+</g>
+<g id="node-role_guard" data-id="role_guard" data-tier="application" data-tech="Node.js">
+<rect x="60.0" y="1007.0" width="230" height="84" rx="4" ry="4" fill="#B98719" filter="url(#shadow)"/>
+<rect x="60.0" y="1007.0" width="230" height="3" rx="2" ry="2" fill="#D7A532"/>
+<rect x="59.5" y="1006.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#D7A532" stroke-width="1" opacity="0.7"/>
+<text x="175.0" y="1024.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[MIDDLEWARE]</text>
+<text x="175.0" y="1045.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Role Guard</text>
+<rect x="142.5" y="1056.0" width="65.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="175.0" y="1069.0" font-family="monospace" font-size="10" fill="#D7A532" text-anchor="middle">Node.js</text>
+<title>Role Guard
+Tier: APPLICATION
+Tech: Node.js
+Role: Enforces RBAC based on JWT claims
+File: middleware/roleGuard.ts:1</title>
+</g>
+<g id="node-csrf_protector" data-id="csrf_protector" data-tier="application" data-tech="csurf">
+<rect x="660.0" y="1007.0" width="230" height="84" rx="4" ry="4" fill="#B98719" filter="url(#shadow)"/>
+<rect x="660.0" y="1007.0" width="230" height="3" rx="2" ry="2" fill="#D7A532"/>
+<rect x="659.5" y="1006.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#D7A532" stroke-width="1" opacity="0.7"/>
+<text x="775.0" y="1024.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[MIDDLEWARE]</text>
+<text x="775.0" y="1045.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">CSRF Protector</text>
+<rect x="745.0" y="1056.0" width="60.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="775.0" y="1069.0" font-family="monospace" font-size="10" fill="#D7A532" text-anchor="middle">csurf</text>
+<title>CSRF Protector
+Tier: APPLICATION
+Tech: csurf
+Role: Prevents cross‑site request forgery
+File: middleware/csrf.ts:1</title>
+</g>
+<g id="node-api_gateway" data-id="api_gateway" data-tier="integration" data-tech="Next.js API Routes">
+<rect x="532.0" y="523.0" width="230" height="84" rx="4" ry="4" fill="#2369BE" filter="url(#shadow)"/>
+<rect x="532.0" y="523.0" width="230" height="3" rx="2" ry="2" fill="#3B8CE8"/>
+<rect x="531.5" y="522.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#3B8CE8" stroke-width="1" opacity="0.7"/>
+<text x="647.0" y="540.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[GATEWAY]</text>
+<text x="647.0" y="561.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Next.js API Gateway</text>
+<rect x="576.0" y="572.0" width="142.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="647.0" y="585.0" font-family="monospace" font-size="10" fill="#3B8CE8" text-anchor="middle">Next.js API Routes</text>
+<title>Next.js API Gateway
+Tier: INTEGRATION
+Tech: Next.js API Routes
+Role: Routes all backend API calls
+File: pages/api/*:1</title>
+</g>
+<g id="node-audit_logger" data-id="audit_logger" data-tier="application" data-tech="winston">
+<rect x="517.5" y="1233.0" width="230" height="84" rx="4" ry="4" fill="#5A4682" filter="url(#shadow)"/>
+<rect x="517.5" y="1233.0" width="230" height="3" rx="2" ry="2" fill="#7D64B0"/>
+<rect x="517.0" y="1232.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#7D64B0" stroke-width="1" opacity="0.7"/>
+<text x="632.5" y="1250.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[COMPONENT]</text>
+<text x="632.5" y="1271.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Audit Logger</text>
+<rect x="600.0" y="1282.0" width="65.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="632.5" y="1295.0" font-family="monospace" font-size="10" fill="#7D64B0" text-anchor="middle">winston</text>
+<title>Audit Logger
+Tier: APPLICATION
+Tech: winston
+Role: Writes security‑relevant events
+File: utils/auditLogger.ts:1</title>
+</g>
+<text x="8" y="1357" font-family="monospace" font-size="9" fill="#404858">Generated by AI Project Visualizer</text>
+</svg>

@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="990" height="1578" style="background:#1E1E22">
+<defs>
+  <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+    <polygon points="0 1, 8 4, 0 7" fill="#6488C8"/>
+  </marker>
+  <marker id="arrow-rev" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+    <polygon points="0 1, 8 4, 0 7" fill="#505060"/>
+  </marker>
+  <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+    <feDropShadow dx="2" dy="3" stdDeviation="3" flood-color="#000000" flood-opacity="0.5"/>
+  </filter>
+</defs>
+<text x="495" y="28" font-family="monospace" font-size="16" font-weight="bold" fill="#A0B4E8" text-anchor="middle">Data Flow &amp; Lifecycle</text>
+<text x="495" y="46" font-family="monospace" font-size="11" fill="#7085A8" text-anchor="middle">Interconnectivity Mesh: 11 nodes, 17 links (1.5x density)</text>
+<path d="M454.2,144.0 V194.0 H495.0 V200.0" fill="none" stroke="#4B9BE8" stroke-width="1.5" marker-end="url(#arrow)" data-from="http_request" data-to="validation_mw" data-type="http"/>
+<rect x="399.0" y="186.0" width="139" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="468.5" y="198.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">HTTP POST /api/... </text>
+<path d="M454.2,290.0 V356.0 H495.0 V362.0" fill="none" stroke="#DC5050" stroke-width="1.5" marker-end="url(#arrow)" data-from="validation_mw" data-to="auth_mw" data-type="auth"/>
+<rect x="427.0" y="348.0" width="83" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="468.5" y="360.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Auth verify</text>
+<path d="M456.7,452.0 V534.0 H495.0 V540.0" fill="none" stroke="#4B9BE8" stroke-width="1.5" marker-end="url(#arrow)" data-from="auth_mw" data-to="controller" data-type="http"/>
+<rect x="393.6" y="526.0" width="153" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="470.1" y="538.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Forward to controller</text>
+<path d="M432.0,630.0 V728.0 H495.0 V734.0" fill="none" stroke="#78829B" stroke-width="1.5" marker-end="url(#arrow)" data-from="controller" data-to="service" data-type="inject"/>
+<rect x="402.1" y="720.0" width="104" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="454.1" y="732.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Invoke service</text>
+<path d="M426.0,824.0 V903.0 H178.0 V976.0" fill="none" stroke="#78829B" stroke-width="1.5" marker-end="url(#arrow)" data-from="service" data-to="repository" data-type="inject"/>
+<rect x="297.7" y="895.0" width="83" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="339.2" y="907.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Persist log</text>
+<path d="M178.0,1066.0 V1422.0 H306.7 V1428.0" fill="none" stroke="#646E82" stroke-width="1.5" marker-end="url(#arrow)" data-from="repository" data-to="mongodb" data-type="mongo"/>
+<rect x="174.5" y="1414.0" width="97" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="223.0" y="1426.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">MongoDB write</text>
+<path d="M518.0,824.0 V1422.0 H721.7 V1428.0" fill="none" stroke="#EBA53C" stroke-width="1.5" marker-end="url(#arrow)" data-from="service" data-to="redis_cache" data-type="cache"/>
+<rect x="519.8" y="1414.0" width="139" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="589.3" y="1426.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Cache write (stats)</text>
+<path d="M472.0,824.0 V936.5 H498.0 V976.0" fill="none" stroke="#EB6E3C" stroke-width="1.5" marker-end="url(#arrow)" data-from="service" data-to="event_publisher" data-type="event"/>
+<rect x="412.4" y="928.5" width="153" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="488.9" y="940.5" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Publish ABTestCreated</text>
+<path d="M454.0,1066.0 V1156.7 H456.7 V1202.0" fill="none" stroke="#DC5582" stroke-width="1.5" marker-end="url(#arrow)" data-from="event_publisher" data-to="async_worker" data-type="queue"/>
+<rect x="378.4" y="1148.7" width="153" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="454.9" y="1160.7" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Consume ABTestCreated</text>
+<path d="M456.7,1292.0 V1382.7 H383.3 V1428.0" fill="none" stroke="#646E82" stroke-width="1.5" marker-end="url(#arrow)" data-from="async_worker" data-to="mongodb" data-type="mongo"/>
+<rect x="379.0" y="1374.7" width="104" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="431.0" y="1386.7" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">MongoDB update</text>
+<path d="M533.3,1292.0 V1422.0 H683.3 V1428.0" fill="none" stroke="#EBA53C" stroke-width="1.5" marker-end="url(#arrow)" data-from="async_worker" data-to="redis_cache" data-type="cache"/>
+<rect x="550.8" y="1414.0" width="160" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="630.8" y="1426.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Cache update (metrics)</text>
+<path d="M564.0,824.0 V970.0 H853.3 V976.0" fill="none" stroke="#78829B" stroke-width="1.5" marker-end="url(#arrow)" data-from="service" data-to="response_builder" data-type="inject"/>
+<rect x="551.2" y="962.0" width="153" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="627.7" y="974.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Build success payload</text>
+<path d="M535.8,144.0 V970.0 H776.7 V976.0" fill="none" stroke="#505060" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrow-rev)" data-from="http_request" data-to="response_builder" data-type="http"/>
+<rect x="557.6" y="962.0" width="125" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="620.1" y="974.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">HTTP 200 response</text>
+<path d="M535.8,290.0 V1422.0 H606.7 V1428.0" fill="none" stroke="#EBA53C" stroke-width="1.5" marker-end="url(#arrow)" data-from="validation_mw" data-to="redis_cache" data-type="cache"/>
+<rect x="477.1" y="1414.0" width="167" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="560.6" y="1426.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Rate‑limit read/write</text>
+<path d="M533.3,452.0 V1422.0 H645.0 V1428.0" fill="none" stroke="#EBA53C" stroke-width="1.5" marker-end="url(#arrow)" data-from="auth_mw" data-to="redis_cache" data-type="cache"/>
+<rect x="527.4" y="1414.0" width="90" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="572.4" y="1426.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Session read</text>
+<path d="M558.0,630.0 V1422.0 H568.3 V1428.0" fill="none" stroke="#EBA53C" stroke-width="1.5" marker-end="url(#arrow)" data-from="controller" data-to="redis_cache" data-type="cache"/>
+<rect x="485.1" y="1414.0" width="153" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="561.6" y="1426.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Cache read (optional)</text>
+<path d="M542.0,1066.0 V1196.0 H533.3 V1202.0" fill="none" stroke="#505060" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrow-rev)" data-from="event_publisher" data-to="async_worker" data-type="event"/>
+<rect x="501.9" y="1188.0" width="69" height="16" rx="2" fill="#16161A" opacity="0.85"/>
+<text x="536.4" y="1200.0" font-family="monospace" font-size="10" fill="#8090A0" text-anchor="middle">Event ack</text>
+<g id="node-http_request" data-id="http_request" data-tier="ingress" data-tech="HTTPS">
+<rect x="372.5" y="60.0" width="245" height="84" rx="4" ry="4" fill="#2369BE" filter="url(#shadow)"/>
+<rect x="372.5" y="60.0" width="245" height="3" rx="2" ry="2" fill="#DCE6FF"/>
+<rect x="372.0" y="59.5" width="246" height="85" rx="4" ry="4" fill="none" stroke="#8CA5E0" stroke-width="2" opacity="0.7"/>
+<text x="495.0" y="77.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[GATEWAY]</text>
+<text x="495.0" y="98.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Incoming HTTP Request</text>
+<rect x="465.0" y="109.0" width="60.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="495.0" y="122.0" font-family="monospace" font-size="10" fill="#3B8CE8" text-anchor="middle">HTTPS</text>
+<title>Incoming HTTP Request
+Tier: INGRESS
+Tech: HTTPS
+Role: External request from browser or client
+[Managed Cloud / External Service]</title>
+</g>
+<g id="node-validation_mw" data-id="validation_mw" data-tier="application" data-tech="Zod">
+<rect x="372.5" y="206.0" width="245" height="84" rx="4" ry="4" fill="#B98719" filter="url(#shadow)"/>
+<rect x="372.5" y="206.0" width="245" height="3" rx="2" ry="2" fill="#D7A532"/>
+<rect x="372.0" y="205.5" width="246" height="85" rx="4" ry="4" fill="none" stroke="#D7A532" stroke-width="1" opacity="0.7"/>
+<text x="495.0" y="223.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[MIDDLEWARE]</text>
+<text x="495.0" y="244.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Validation Middleware</text>
+<rect x="465.0" y="255.0" width="60.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="495.0" y="268.0" font-family="monospace" font-size="10" fill="#D7A532" text-anchor="middle">Zod</text>
+<title>Validation Middleware
+Tier: APPLICATION
+Tech: Zod
+Role: Validates request payloads
+File: middleware/validation.ts:1</title>
+</g>
+<g id="node-auth_mw" data-id="auth_mw" data-tier="application" data-tech="NextAuth|JWT">
+<rect x="380.0" y="368.0" width="230" height="84" rx="4" ry="4" fill="#B98719" filter="url(#shadow)"/>
+<rect x="380.0" y="368.0" width="230" height="3" rx="2" ry="2" fill="#D7A532"/>
+<rect x="379.5" y="367.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#D7A532" stroke-width="1" opacity="0.7"/>
+<text x="495.0" y="385.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[MIDDLEWARE]</text>
+<text x="495.0" y="406.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Auth Middleware</text>
+<rect x="445.0" y="417.0" width="100.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="495.0" y="430.0" font-family="monospace" font-size="10" fill="#D7A532" text-anchor="middle">NextAuth|JWT</text>
+<title>Auth Middleware
+Tier: APPLICATION
+Tech: NextAuth|JWT
+Role: Verifies JWT and loads session
+File: middleware/auth.ts:1</title>
+</g>
+<g id="node-controller" data-id="controller" data-tier="integration" data-tech="Next.js API Route">
+<rect x="306.0" y="546.0" width="378" height="84" rx="4" ry="4" fill="#2D75C8" filter="url(#shadow)"/>
+<rect x="306.0" y="546.0" width="378" height="3" rx="2" ry="2" fill="#4A9AE8"/>
+<rect x="305.5" y="545.5" width="379" height="85" rx="4" ry="4" fill="none" stroke="#4A9AE8" stroke-width="1" opacity="0.7"/>
+<text x="495.0" y="563.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[ENDPOINT]</text>
+<text x="495.0" y="584.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">API Controller (e.g., /ap...</text>
+<rect x="427.5" y="595.0" width="135.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="495.0" y="608.0" font-family="monospace" font-size="10" fill="#4A9AE8" text-anchor="middle">Next.js API Route</text>
+<title>API Controller (e.g., /api/results)
+Tier: INTEGRATION
+Tech: Next.js API Route
+Role: Handles AB test result endpoints
+File: app/api/monitor/ping/route.ts:1</title>
+</g>
+<g id="node-service" data-id="service" data-tier="application" data-tech="Node.js">
+<rect x="380.0" y="740.0" width="230" height="84" rx="4" ry="4" fill="#1E8C9E" filter="url(#shadow)"/>
+<rect x="380.0" y="740.0" width="230" height="3" rx="2" ry="2" fill="#30ABC0"/>
+<rect x="379.5" y="739.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#30ABC0" stroke-width="1" opacity="0.7"/>
+<text x="495.0" y="757.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[SERVICE]</text>
+<text x="495.0" y="778.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">ABTest Service</text>
+<rect x="462.5" y="789.0" width="65.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="495.0" y="802.0" font-family="monospace" font-size="10" fill="#30ABC0" text-anchor="middle">Node.js</text>
+<title>ABTest Service
+Tier: APPLICATION
+Tech: Node.js
+Role: Business logic for AB test processing
+File: services/abtestService.ts:1</title>
+</g>
+<g id="node-repository" data-id="repository" data-tier="persistence" data-tech="Mongoose">
+<rect x="60.0" y="982.0" width="236" height="84" rx="4" ry="4" fill="#484858" filter="url(#shadow)"/>
+<rect x="60.0" y="982.0" width="236" height="3" rx="2" ry="2" fill="#686878"/>
+<rect x="59.5" y="981.5" width="237" height="85" rx="4" ry="4" fill="none" stroke="#686878" stroke-width="1" opacity="0.7"/>
+<text x="178.0" y="999.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[REPOSITORY]</text>
+<text x="178.0" y="1020.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">ABTestLog Repository</text>
+<rect x="142.0" y="1031.0" width="72.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="178.0" y="1044.0" font-family="monospace" font-size="10" fill="#686878" text-anchor="middle">Mongoose</text>
+<title>ABTestLog Repository
+Tier: PERSISTENCE
+Tech: Mongoose
+Role: Encapsulates MongoDB access
+File: repositories/abtestLogRepo.ts:1</title>
+</g>
+<g id="node-mongodb" data-id="mongodb" data-tier="persistence" data-tech="MongoDB">
+<rect x="230.0" y="1434.0" width="230" height="84" rx="4" ry="4" fill="#2D914B" filter="url(#shadow)"/>
+<rect x="230.0" y="1434.0" width="230" height="3" rx="2" ry="2" fill="#DCE6FF"/>
+<rect x="229.5" y="1433.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#8CA5E0" stroke-width="2" opacity="0.7"/>
+<text x="345.0" y="1451.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[DATABASE]</text>
+<text x="345.0" y="1472.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">MongoDB</text>
+<rect x="312.5" y="1483.0" width="65.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="345.0" y="1496.0" font-family="monospace" font-size="10" fill="#45B868" text-anchor="middle">MongoDB</text>
+<title>MongoDB
+Tier: PERSISTENCE
+Tech: MongoDB
+Role: Document store for AB logs
+[Managed Cloud / External Service]</title>
+</g>
+<g id="node-redis_cache" data-id="redis_cache" data-tier="persistence" data-tech="Redis">
+<rect x="530.0" y="1434.0" width="230" height="84" rx="4" ry="4" fill="#D2821E" filter="url(#shadow)"/>
+<rect x="530.0" y="1434.0" width="230" height="3" rx="2" ry="2" fill="#DCE6FF"/>
+<rect x="529.5" y="1433.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#8CA5E0" stroke-width="2" opacity="0.7"/>
+<text x="645.0" y="1451.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[CACHE]</text>
+<text x="645.0" y="1472.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Redis Cache</text>
+<rect x="615.0" y="1483.0" width="60.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="645.0" y="1496.0" font-family="monospace" font-size="10" fill="#EAA03C" text-anchor="middle">Redis</text>
+<title>Redis Cache
+Tier: PERSISTENCE
+Tech: Redis
+Role: Cache for rate‑limit counters &amp; session data
+[Managed Cloud / External Service]</title>
+</g>
+<g id="node-event_publisher" data-id="event_publisher" data-tier="integration" data-tech="Kafka">
+<rect x="366.0" y="982.0" width="264" height="84" rx="4" ry="4" fill="#BE3764" filter="url(#shadow)"/>
+<rect x="366.0" y="982.0" width="264" height="3" rx="2" ry="2" fill="#DC5582"/>
+<rect x="365.5" y="981.5" width="265" height="85" rx="4" ry="4" fill="none" stroke="#DC5582" stroke-width="1" opacity="0.7"/>
+<text x="498.0" y="999.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[QUEUE]</text>
+<text x="498.0" y="1020.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Event Publisher (Kafka)</text>
+<rect x="468.0" y="1031.0" width="60.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="498.0" y="1044.0" font-family="monospace" font-size="10" fill="#DC5582" text-anchor="middle">Kafka</text>
+<title>Event Publisher (Kafka)
+Tier: INTEGRATION
+Tech: Kafka
+Role: Publishes domain events
+File: infra/eventBus.ts:1</title>
+</g>
+<g id="node-async_worker" data-id="async_worker" data-tier="integration" data-tech="gRPC">
+<rect x="380.0" y="1208.0" width="230" height="84" rx="4" ry="4" fill="#1E8C9E" filter="url(#shadow)"/>
+<rect x="380.0" y="1208.0" width="230" height="3" rx="2" ry="2" fill="#30ABC0"/>
+<rect x="379.5" y="1207.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#30ABC0" stroke-width="1" opacity="0.7"/>
+<text x="495.0" y="1225.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[SERVICE]</text>
+<text x="495.0" y="1246.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Async Worker (gRPC)</text>
+<rect x="465.0" y="1257.0" width="60.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="495.0" y="1270.0" font-family="monospace" font-size="10" fill="#30ABC0" text-anchor="middle">gRPC</text>
+<title>Async Worker (gRPC)
+Tier: INTEGRATION
+Tech: gRPC
+Role: Consumes events and runs background checks
+File: workers/monitorWorker.ts:1</title>
+</g>
+<g id="node-response_builder" data-id="response_builder" data-tier="application" data-tech="Node.js">
+<rect x="700.0" y="982.0" width="230" height="84" rx="4" ry="4" fill="#5A4682" filter="url(#shadow)"/>
+<rect x="700.0" y="982.0" width="230" height="3" rx="2" ry="2" fill="#7D64B0"/>
+<rect x="699.5" y="981.5" width="231" height="85" rx="4" ry="4" fill="none" stroke="#7D64B0" stroke-width="1" opacity="0.7"/>
+<text x="815.0" y="999.0" font-family="monospace" font-size="10" fill="#94A3B8" text-anchor="middle">[COMPONENT]</text>
+<text x="815.0" y="1020.0" font-family="sans-serif, system-ui" font-size="12" font-weight="bold" fill="#F1F5F9" text-anchor="middle">Response Builder</text>
+<rect x="782.5" y="1031.0" width="65.0" height="18" rx="3" fill="#111827" stroke="#334155" stroke-width="0.8" opacity="0.85"/>
+<text x="815.0" y="1044.0" font-family="monospace" font-size="10" fill="#7D64B0" text-anchor="middle">Node.js</text>
+<title>Response Builder
+Tier: APPLICATION
+Tech: Node.js
+Role: Formats HTTP responses
+File: utils/response.ts:1</title>
+</g>
+<text x="8" y="1558" font-family="monospace" font-size="9" fill="#404858">Generated by AI Project Visualizer</text>
+</svg>
