@@ -49,7 +49,7 @@ function isPrivateIp(hostname: string): boolean {
   return BLOCKED_CIDRS.some(cidr => cidrContains(cidr, hostname));
 }
 
-function validateUrl(url: string): { valid: boolean; reason?: string } {
+function validateUrl(url: string): { valid: boolean; reason: string } {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -78,15 +78,15 @@ function validateUrl(url: string): { valid: boolean; reason?: string } {
     return { valid: false, reason: 'Localhost access blocked' };
   }
 
-  return { valid: true };
+  return { valid: true, reason: '' };
 }
 
 // 1. The Ping Logic (Optimized for headless execution)
-async function checkTarget(url: string) {
+async function checkTarget(url: string): Promise<{ latency: number; status: "up" | "down"; reason: string }> {
   // Validate URL before making request
   const validation = validateUrl(url);
   if (!validation.valid) {
-    return { latency: 0, status: "down" as const, reason: validation.reason };
+    return { latency: 0, status: "down", reason: validation.reason };
   }
 
   const start = performance.now();
