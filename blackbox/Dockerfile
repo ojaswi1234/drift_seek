@@ -16,5 +16,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Run as non-root user (default in prom/blackbox-exporter)
 USER nobody
 
-# Entry point is inherited from base image
-# CMD ["--config.file=/etc/blackbox_exporter/config.yml"]
+# Entry point with config file - REQUIRED for the exporter to start properly
+CMD ["--config.file=/etc/blackbox_exporter/config.yml"]

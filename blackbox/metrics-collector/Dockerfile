@@ -1,6 +1,9 @@
 # Metrics Collector for Blackbox Exporter
 FROM node:20-alpine
 
+# Install wget for health checks
+RUN apk add --no-cache wget
+
 WORKDIR /app
 
 # Copy package files
@@ -17,8 +20,8 @@ ENV PORT=9116
 # Expose the API port
 EXPOSE 9116
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+# Health check - verifies both API and MongoDB connectivity
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:9116/health || exit 1
 
 # Start the application
