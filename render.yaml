@@ -29,13 +29,14 @@ services:
       - key: GRPC_PORT
         value: "50052"
       - key: NEXT_PUBLIC_API_BASE_URL
-        value: https://driftseeker-app.onrender.com
+        value: https://drift-seek.vercel.app
     healthCheckPath: /
     autoDeploy: true
     # Note: Docker socket access not available on Render free tier
     # For production, consider using a separate Docker host or Render's native services
 
-  # Main Next.js App
+  # Main Next.js App (Deployed on Vercel - this service may not be needed on Render)
+  # Keeping for reference if you want to deploy on Render too
   - type: web
     name: driftseeker-app
     env: docker
@@ -48,11 +49,11 @@ services:
       - key: PORT
         value: "3000"
       - key: NEXTAUTH_URL
-        value: https://driftseeker-app.onrender.com/api/auth/callback/github
+        value: https://drift-seek.vercel.app/api/auth/callback/github
       - key: NEXT_PUBLIC_API_BASE_URL
-        value: https://driftseeker-app.onrender.com
+        value: https://drift-seek.vercel.app
       - key: NEXT_PUBLIC_SERVER_BASE_URL
-        value: https://driftseeker-terminal-server.onrender.com
+        value: https://driftseek.duckdns.org
       - key: MONGODB_URI
         sync: false
       - key: REDIS_URL
@@ -102,9 +103,9 @@ services:
       - key: COLLECTION_INTERVAL
         value: "60000"
       - key: APP_URL
-        value: https://driftseeker-app.onrender.com
+        value: https://drift-seek.vercel.app
       - key: TERMINAL_URL
-        value: https://driftseeker-terminal-server.onrender.com
+        value: https://driftseek.duckdns.org
       - key: GRPC_URL
         value: driftseeker-grpc-worker:50051
     healthCheckPath: /health

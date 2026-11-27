@@ -191,7 +191,7 @@ export async function GET(req: Request) {
 
     // Loop through every server in your database
     for (const server of servers) {
-      const monitorId = server._id.toString();
+      const monitorId = (server._id as any).toString();
       const surgeConfig = configMap.get(monitorId);
       
       // Determine monitoring mode and interval

@@ -133,17 +133,15 @@ export async function POST(
       return NextResponse.json({ message: "Monitor not found" }, { status: 404 });
     }
 
-    // Fetch surge config for telegram settings
-    const surgeConfig = await SurgeConfig.findOne({ monitorId: id, ownerEmail: session.user.email });
-    const telegramEnabled = surgeConfig?.telegramEnabled ?? true;
+    // Check surge config for telegram settings
+    const surgeConfig = await SurgeConfig.findOne({ monitorId: id });
+    const telegramEnabled = surgeConfig?.telegramEnabled ?? false;
 
-    // Perform the check
     const { latency, status, reason, headers } = await checkTarget(server.url);
-
-    // Update Redis with latest metrics
-    const redisKey = `monitor:stats:${id}`;
     const now = new Date().toISOString();
-    
+
+    // Update Redis cache
+    const redisKey = `monitor:stats:${id}`;
     try {
       await redis.hset(redisKey, {
         status,
@@ -184,7 +182,11 @@ export async function POST(
         `Time: ${now}`;
       
       try {
-        await sendTelegramAlert(message);
+        await sendTelegramAlert({
+          url: server.url,
+          reason: message,
+          ownerEmail: server.ownerEmail,
+        });
       } catch (telegramErr) {
         console.warn("Telegram alert failed:", telegramErr);
       }

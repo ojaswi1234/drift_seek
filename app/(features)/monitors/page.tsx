@@ -10,7 +10,7 @@ import GlobalLoader from "@/components/GlobalLoader";
 import GithubRepoModal, { GitHubRepo } from "@/components/modals/githubRepos/githubrepoModal";
 import ABResultStatsModal, { ABResultData } from "@/components/modals/results/ABResultStatsModal";
 import { io, Socket } from "socket.io-client";
-import { Activity, Eye, RefreshCw } from "lucide-react";
+import { Activity, Eye, RefreshCw, GitFork, GitBranch } from "lucide-react";
 
 type MonitorSocketPayload = {
   id: string;
@@ -117,93 +117,53 @@ export default function Page() {
       .then((data) => {
         const webServersData = Array.isArray(data) ? data : data.webservers || [];
         setWebsite(webServersData);
+        setIsLoading(false);
       })
-      .catch((err) => console.error("Error fetching webservers:", err))
-      .finally(() => setIsLoading(false));
+      .catch((err) => {
+        console.error("Failed to fetch monitors:", err);
+        setIsLoading(false);
+      });
   };
 
-  // --- NEW: FETCH AB TEST RESULTS ---
-  const fetchContainerResults = async () => {
-    try {
-      const res = await fetch("/api/abtest/results");
-      const data = await res.json();
+  useEffect(() => {
+    fetchMonitors();
+  }, []);
 
-      if (data.success && Array.isArray(data.data)) {
-        const flattened = data.data
-          .flatMap((repo: any) =>
-            (repo.abTests || []).map((test: any) => ({
-              githubUrl: repo.githubUrl,
-              metrics: test,
-              testedAt: test.testedAt,
-            })),
-          )
-          .sort((a: ABResultData, b: ABResultData) => new Date(b.testedAt).getTime() - new Date(a.testedAt).getTime());
-
-        setContainer(flattened);
-        return flattened;
-      }
-
-      return [] as ABResultData[];
-    } catch (err) {
-      console.error("Error fetching AB test logs:", err);
-      return [] as ABResultData[];
-    }
-  };
-
-  const getLatestTestTimestamp = (results: ABResultData[], githubUrl: string) => {
-    return results
-      .filter((result) => result.githubUrl === githubUrl)
-      .reduce((max, result) => Math.max(max, new Date(result.testedAt).getTime()), 0);
-  };
-
-  const stopPollingForResults = () => {
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-    }
-    if (pollingTimeoutRef.current) {
-      clearTimeout(pollingTimeoutRef.current);
-      pollingTimeoutRef.current = null;
-    }
-    pollingTargetRef.current = null;
-    setIsEngineRunning(false);
-    setEngineTarget(null);
-  };
-
-  // --- SURGE PREDICTION API CALLS ---
-  const handleSaveSurgeConfig = async (monitorId: string, config: Partial<SurgeConfig>) => {
-    const res = await fetch(`/api/monitor/${monitorId}/surge-config`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(config),
+  // Socket.io connection for real-time updates
+  useEffect(() => {
+    const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "", {
+      transports: ["websocket"],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.message || "Failed to save surge config");
-    }
-  };
 
-  const handleGenerateReadinessReport = async (monitorId: string): Promise<ReadinessReport | null> => {
-    const res = await fetch(`/api/monitor/${monitorId}/readiness-report`, {
-      method: "POST",
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      setIsSocketConnected(true);
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.message || "Failed to generate readiness report");
-    }
-    return res.json();
-  };
 
-  const handleTriggerManualCheck = async (monitorId: string) => {
-    const res = await fetch(`/api/monitor/${monitorId}/trigger-check`, {
-      method: "POST",
+    socket.on("disconnect", () => {
+      setIsSocketConnected(false);
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.message || "Failed to trigger check");
-    }
-  };
 
+    socket.on("monitor_update", (data: MonitorSocketPayload) => {
+      setWebsite((prev: any[]) =>
+        prev.map((server) =>
+          server._id === data.id
+            ? { ...server, status: data.status, latency: data.latency, reason: data.reason, lastChecked: data.lastChecked }
+            : server
+        )
+      );
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
+  // --- SURGE PREDICTION LOGIC ---
   const handleOpenSurgeModal = (monitor: { id: string; name?: string; url: string }) => {
     setSelectedMonitor(monitor);
     setIsSurgeModalOpen(true);
@@ -214,345 +174,341 @@ export default function Page() {
     setSelectedMonitor(null);
   };
 
-  // --- SOCKET CONNECTION ---
-  React.useEffect(() => {
-    if (status !== "authenticated") return;
-
-    let cancelled = false;
-
-    const connectSocket = async () => {
-      const socketBaseUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
-      const shouldUseInternalSocketRoute = !socketBaseUrl;
-      const socketPath =
-        process.env.NEXT_PUBLIC_SOCKET_PATH ||
-        (shouldUseInternalSocketRoute ? "/api/socketio" : "/socket.io");
-
-      if (shouldUseInternalSocketRoute) {
-        try {
-          await fetch("/api/socket", { method: "GET" });
-        } catch (error) {
-          console.error("Failed to initialize monitor socket route:", error);
-        }
-      }
-
-      if (cancelled) return;
-
-      const socket = io(socketBaseUrl || undefined, {
-        path: socketPath,
-        transports: ["websocket", "polling"],
-        reconnection: true,
-        reconnectionAttempts: 20,
-        reconnectionDelay: 1000,
+  const handleSaveSurgeConfig = async (monitorId: string, config: Partial<SurgeConfig>) => {
+    try {
+      const res = await fetch(`/api/monitor/${monitorId}/surge-config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config),
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to save config");
+      console.log("Surge config saved:", data);
+    } catch (err: any) {
+      console.error("Save surge config error:", err);
+      throw err;
+    }
+  };
 
-      socketRef.current = socket;
-
-      socket.on("connect", () => setIsSocketConnected(true));
-      socket.on("disconnect", () => setIsSocketConnected(false));
-      socket.on("monitor:metric", (payload: MonitorSocketPayload) => {
-        setWebsite((prev) =>
-          prev.map((monitor: any) => {
-            const monitorId = String(monitor.id || monitor._id || "");
-            if (monitorId !== payload.id) return monitor;
-            return {
-              ...monitor,
-              status: payload.status,
-              latency: payload.latency,
-              reason: payload.reason,
-              lastChecked: payload.lastChecked,
-            };
-          }),
-        );
+  const handleGenerateReadinessReport = async (monitorId: string): Promise<ReadinessReport | null> => {
+    try {
+      const res = await fetch(`/api/monitor/${monitorId}/readiness-report`, {
+        method: "POST",
       });
-    };
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to generate report");
+      return data.report;
+    } catch (err: any) {
+      console.error("Generate readiness report error:", err);
+      throw err;
+    }
+  };
 
-    connectSocket().catch(console.error);
+  const handleTriggerCheck = async (monitorId: string): Promise<void> => {
+    try {
+      const res = await fetch(`/api/monitor/${monitorId}/trigger-check`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      console.log("Manual check result:", data);
+    } catch (err) {
+      console.error("Trigger check error:", err);
+    }
+  };
 
-    return () => {
-      cancelled = true;
-      socketRef.current?.off("connect");
-      socketRef.current?.off("disconnect");
-      socketRef.current?.off("monitor:metric");
-      socketRef.current?.disconnect();
-      socketRef.current = null;
-      setIsSocketConnected(false);
-    };
-  }, [status]);
-
-  // --- CONTAINER / STRESS ENGINE LOGIC ---
+  // --- GITHUB REPO / STRESS ENGINE LOGIC ---
   const handleOpenGithubModal = async () => {
     setIsGithubModalOpen(true);
-    if (repos.length > 0) return;
-
     setIsFetchingRepos(true);
     try {
-      const res = await fetch('/api/github/repos');
-      if (!res.ok) throw new Error("Failed to fetch repositories");
+      const res = await fetch("/api/github/repos");
       const data = await res.json();
-      setRepos(data.repos || data);
+      setRepos(data.repos || []);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to fetch repos:", err);
     } finally {
       setIsFetchingRepos(false);
     }
   };
 
   const handleRunStressTest = async (githubUrl: string, branches?: string[]) => {
+    setIsGithubModalOpen(false);
     setIsEngineRunning(true);
     setEngineTarget(githubUrl);
     setEngineError(null);
-    pollingTargetRef.current = githubUrl;
-    pollingBaselineRef.current = getLatestTestTimestamp(container, githubUrl);
-    
-    try {
-      if (!branches || branches.length !== 2) {
-        throw new Error('Please select exactly 2 branches for the A/B performance test.');
-      }
 
-      const res = await fetch('/api/abtest/trigger', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+    try {
+      const res = await fetch("/api/stress/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ githubUrl, branches }),
       });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to start pipeline');
+      
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || "Failed to trigger stress test");
       }
-
-      const pollForResults = async () => {
-        if (!pollingTargetRef.current) return;
-
-        const latestResults = await fetchContainerResults();
-        const latestTimestamp = getLatestTestTimestamp(latestResults, pollingTargetRef.current);
-
-        if (latestTimestamp > pollingBaselineRef.current) {
-          stopPollingForResults();
-        }
-      };
-
-      await pollForResults();
-
-      pollingIntervalRef.current = window.setInterval(() => {
-        pollForResults().catch((pollError) => {
-          console.error("Error while polling for A/B results:", pollError);
-        });
-      }, 15000);
-
-      pollingTimeoutRef.current = window.setTimeout(() => {
-        if (pollingTargetRef.current) {
-          setEngineError("Timed out waiting for new A/B results.");
-        }
-        stopPollingForResults();
-      }, 10 * 60 * 1000);
-
+      
+      const data = await res.json();
+      console.log("Stress test triggered:", data);
+      
+      // Start polling for results
+      startPolling(githubUrl);
     } catch (err: any) {
       setEngineError(err.message);
-      stopPollingForResults();
+      setIsEngineRunning(false);
     }
   };
 
-  return (
-    <div className="flex flex-col h-screen bg-white py-10 px-6 md:px-12 lg:px-44 font-orbitron text-black overflow-hidden">
-      {/* Header Section */}
-      <h1 className="text-3xl md:text-4xl font-bold mb-4 tracking-wide shrink-0">
-        <span className="font-sans text-transparent bg-clip-text outlined-text">
-          24/7
-        </span>{" "}
-        Web server Monitoring
-      </h1>
-      <hr className="border-gray-200 shrink-0" />
-
-      <p className="text-md text-gray-600 mt-4 mb-10 shrink-0">
-        Monitor the uptime and performance of your web servers & containers with
-        real-time metrics and alerts.
-      </p>
-
-      <p className="text-xs font-mono tracking-wider text-gray-500 mb-6 shrink-0">
-        SOCKET_LINK: {isSocketConnected ? "CONNECTED" : "DISCONNECTED"}
-      </p>
-
-      <div className="flex flex-col lg:flex-row w-full flex-1 gap-10 lg:gap-16 min-h-0">
+  const startPolling = (githubUrl: string) => {
+    pollingTargetRef.current = githubUrl;
+    pollingBaselineRef.current = Date.now();
+    
+    const poll = async () => {
+      if (pollingTargetRef.current !== githubUrl) return;
+      
+      try {
+        const res = await fetch(`/api/stress/results?url=${encodeURIComponent(githubUrl)}`);
+        const data = await res.json();
         
-        {/* LEFT COLUMN: WEB SERVERS */}
-        <aside className="w-full lg:w-1/2 flex flex-col h-full min-h-0">
-          <button 
-            className="shrink-0 self-end mb-6 px-6 py-3 bg-black text-white uppercase text-sm tracking-widest hover:bg-zinc-800 transition-all cursor-pointer"
-            onClick={() => setIsModalOpen(true)}
-          >
-            + Add Monitor
-          </button>
+        if (data.results && data.results.length > 0) {
+          setContainer(data.results);
+          setIsEngineRunning(false);
+          pollingIntervalRef.current && clearInterval(pollingIntervalRef.current);
+          return;
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+      
+      // Timeout after 10 minutes
+      if (Date.now() - pollingBaselineRef.current > 10 * 60 * 1000) {
+        setEngineError("Test timed out after 10 minutes");
+        setIsEngineRunning(false);
+        pollingIntervalRef.current && clearInterval(pollingIntervalRef.current);
+      }
+    };
+    
+    pollingIntervalRef.current = window.setInterval(poll, 5000);
+    poll();
+  };
 
-          {isLoading ? (
-            <div className="flex-1 flex flex-col items-center justify-center min-h-62.5 border-2 border-dashed border-gray-200 rounded-lg p-6">
-              <GlobalLoader />
-            </div>
-          ) : website.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center min-h-62.5 border-2 border-dashed border-gray-200 rounded-lg p-6">
-              <p className="text-gray-400 text-center">
-                Add your website to monitor
-              </p>
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-10 scrollbtn">
-              {website.map((item, index) => (
-                <MonitorCard 
-                  key={index}
-                  id={item.id || item._id}
-                  name={item.name}
-                  url={item.url}
-                  status={item.status}
-                  reason={item.reason}
-                  latency={item.latency}
-                  lastChecked={item.lastChecked || item.updatedAt}
-                  onDelete={(idToRemove) => setWebsite(prev => prev.filter((w: any) => (w.id || w._id) !== idToRemove))}
-                  onCheck={(id) => {
-                    fetch('/api/monitor/ping', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ id }),
-                    }).finally(() => fetchMonitors());
-                  }}
-                  onOpenSurgeModal={handleOpenSurgeModal}
-                />
-              ))}
-            </div>
-          )}
-        </aside>
+  useEffect(() => {
+    return () => {
+      pollingIntervalRef.current && clearInterval(pollingIntervalRef.current);
+      pollingTimeoutRef.current && clearTimeout(pollingTimeoutRef.current);
+    };
+  }, []);
 
-        <div className="hidden lg:block w-0.5 bg-gray-300 self-stretch rounded-full shrink-0"></div>
-        <hr className="block lg:hidden border-gray-100 w-full shrink-0" />
+  // --- RENDER ---
+  if (status === "loading") return <GlobalLoader />;
 
-        {/* RIGHT COLUMN: CONTAINERS & PIPELINES */}
-        <aside className="w-full lg:w-1/2 flex flex-col h-full min-h-0">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center gap-3">
-              <h2 className="font-bold text-lg text-gray-800 tracking-wide uppercase">A/B Test Reports</h2>
-              <button 
-                onClick={fetchContainerResults}
-                className="p-1.5 text-gray-400 hover:text-black hover:bg-gray-100 rounded-full transition-colors"
-                title="Refresh Results"
-              >
-                <RefreshCw size={18} />
-              </button>
+  return (
+    <div className="min-h-screen bg-gray-50 font-sans">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-3xl font-bold font-orbitron tracking-tight text-gray-900">
+              System Monitors
+            </h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Real-time infrastructure monitoring & stress testing
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono uppercase tracking-wider ${
+              isSocketConnected ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${isSocketConnected ? "bg-green-500" : "bg-red-500"}`} />
+              {isSocketConnected ? "Live" : "Offline"}
             </div>
-            <button 
-              className="px-6 py-3 bg-black text-white uppercase text-sm tracking-widest hover:bg-zinc-800 transition-all cursor-pointer"
+            <button
               onClick={handleOpenGithubModal}
+              className="px-4 py-2 bg-black text-white text-sm font-mono uppercase tracking-wider rounded-lg hover:bg-zinc-800 transition-colors flex items-center gap-2"
               disabled={isEngineRunning}
             >
-              + Add Container
+              <GitFork className="w-4 h-4" />
+              Stress Test
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="px-4 py-2 bg-white text-black text-sm font-mono uppercase tracking-wider rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-2"
+            >
+              <Activity className="w-4 h-4" />
+              Add Monitor
             </button>
           </div>
-          
-          {engineError && (
-             <div className="shrink-0 mb-4 bg-red-50 text-red-600 p-3 rounded-lg border border-red-200 text-sm font-sans">
-               <strong>Execution Error:</strong> {engineError}
-             </div>
-          )}
+        </div>
 
-          {isEngineRunning ? (
-            <div className="flex-1 flex flex-col items-center justify-center min-h-62.5 border-2 border-dashed border-emerald-500/50 bg-emerald-50/50 rounded-lg p-6 animate-in fade-in">
-              <Activity className="animate-pulse text-emerald-500 mb-4" size={40} />
-              <p className="text-emerald-700 font-bold mb-2 uppercase tracking-wide">Executing Pipeline</p>
-              <p className="text-xs text-emerald-600 text-center font-mono max-w-[80%]">
-                Cloning & testing in Ephemeral Sandbox:<br/>
-                <span className="font-bold">{engineTarget}</span>
-              </p>
-              <p className="text-[10px] text-emerald-500 mt-2 italic">Results will appear shortly.</p>
+        {/* Main Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* WebServer Monitors */}
+          <div className="lg:col-span-2">
+            <div className="bg-white border border-gray-100 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-bold font-orbitron tracking-wide text-gray-900">
+                  WebServer Monitors
+                </h2>
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm text-gray-500 font-mono">
+                    {website.length} monitors
+                  </span>
+                </div>
+              </div>
+
+              {isLoading ? (
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="h-32 bg-gray-100 rounded-lg" />
+                    </div>
+                  ))}
+                </div>
+              ) : website.length === 0 ? (
+                <div className="text-center py-12">
+                  <Eye className="w-12 h-12 mx-auto text-gray-300 mb-4" />
+                  <p className="text-gray-500 mb-4">No monitors configured</p>
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="px-4 py-2 bg-black text-white text-sm font-mono uppercase tracking-wider rounded-lg hover:bg-zinc-800 transition-colors"
+                  >
+                    Add First Monitor
+                  </button>
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {website.map((server: any) => (
+                    <MonitorCard
+                      key={server._id}
+                      id={server._id}
+                      name={server.name}
+                      url={server.url}
+                      status={server.status}
+                      reason={server.reason}
+                      latency={server.latency}
+                      lastChecked={server.lastChecked}
+                      onOpenSurgeModal={handleOpenSurgeModal}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-          ) : container.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center min-h-62.5 border-2 border-dashed border-gray-200 rounded-lg p-6">
-              <p className="text-gray-400 text-center">
-                Add a GitHub repository to run A/B performance tests
-              </p>
+          </div>
+
+          {/* Stress Engine Results Panel */}
+          <aside className="bg-white border border-gray-100 rounded-xl p-6 flex flex-col h-[600px]">
+            <div className="flex items-center justify-between mb-6 shrink-0">
+              <h2 className="text-lg font-bold font-orbitron tracking-wide text-gray-900">
+                Stress Engine
+              </h2>
+              {isEngineRunning && (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Running...
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-10 scrollbtn">
-              {container.map((item, index) => (
-                <div key={index} className="group relative p-5 bg-white border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-300 rounded-lg">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <div className="p-2 rounded-md bg-purple-50 text-purple-600 shrink-0">
-                        <Activity size={18} />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-black font-orbitron font-bold tracking-wide text-sm truncate">
-                          {item.githubUrl.split("/").slice(-2).join("/")}
-                        </h3>
-                        <p className="text-gray-500 text-[11px] font-mono mt-1 truncate">
-                          {item.githubUrl}
+
+            {engineError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 font-mono">
+                {engineError}
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto space-y-4">
+              {container.length === 0 && !isEngineRunning ? (
+                <div className="text-center py-12 text-gray-400">
+                  <GitBranch className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">No test results yet</p>
+                  <p className="text-xs mt-1">Run a stress test to see results</p>
+                </div>
+              ) : (
+                container.map((item) => (
+                  <div
+                    key={item.githubUrl + item.testedAt}
+                    className="border border-gray-100 rounded-lg p-4 hover:border-gray-200 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-gray-500 font-mono uppercase tracking-wider mb-1">
+                          {item.githubUrl.replace("https://github.com/", "")}
+                        </p>
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {item.metrics.baselineBranch || "baseline"} vs {item.metrics.candidateBranch || "candidate"}
                         </p>
                       </div>
-                    </div>
-                    <div className="px-2 py-1 rounded text-[10px] font-mono font-bold border border-purple-200 bg-purple-50 text-purple-700 uppercase tracking-widest">
-                      A/B Test
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-px bg-gray-100 border border-gray-100 overflow-hidden rounded-md my-4">
-                    <div className="bg-white p-3 flex flex-col justify-center">
-                      <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-1">Branch A</span>
-                      <span className="text-lg font-bold font-orbitron text-black">
-                        {item.metrics.branchA?.name || "N/A"}
+                      <span className={`px-2 py-1 text-xs font-bold rounded-full ${
+                        item.metrics.passed !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                      }`}>
+                        {item.metrics.passed !== false ? "PASSED" : "FAILED"}
                       </span>
                     </div>
-                    <div className="bg-white p-3 flex flex-col justify-center">
-                      <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-1">Branch B</span>
-                      <span className="text-lg font-bold font-orbitron text-black">
-                        {item.metrics.branchB?.name || "N/A"}
+
+                    <div className="grid grid-cols-2 gap-px bg-gray-100 border border-gray-100 overflow-hidden rounded-md my-4">
+                      <div className="bg-white p-3 flex flex-col justify-center">
+                        <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-1">Branch A</span>
+                        <span className="text-lg font-bold font-orbitron text-black">
+                          {item.metrics.baselineBranch || "N/A"}
+                        </span>
+                      </div>
+                      <div className="bg-white p-3 flex flex-col justify-center">
+                        <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-1">Branch B</span>
+                        <span className="text-lg font-bold font-orbitron text-black">
+                          {item.metrics.candidateBranch || "N/A"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                      <button
+                        onClick={() => setSelectedResult(item)}
+                        className="px-3 py-1.5 text-xs font-mono bg-black text-white rounded hover:bg-zinc-800 transition-colors"
+                      >
+                        View Details
+                      </button>
+                      <span className="text-[10px] text-gray-400 font-mono">
+                        {new Date(item.testedAt).toLocaleString()}
                       </span>
                     </div>
                   </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                    <button
-                      onClick={() => setSelectedResult(item)}
-                      className="px-3 py-1.5 text-xs font-mono bg-black text-white rounded hover:bg-zinc-800 transition-colors"
-                    >
-                      View Details
-                    </button>
-                    <span className="text-[10px] text-gray-400 font-mono">
-                      {new Date(item.testedAt).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
-          )}
-        </aside>
+          </aside>
+        </div>
+
+        {/* Modals */}
+        <WebserverMonitorModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSuccess={fetchMonitors}
+        />
+
+        <SurgePredictionModal
+          isOpen={isSurgeModalOpen}
+          onClose={handleCloseSurgeModal}
+          monitor={selectedMonitor}
+          onSaveConfig={handleSaveSurgeConfig}
+          onGenerateReport={handleGenerateReadinessReport}
+          onTriggerCheck={handleTriggerCheck}
+        />
+
+        <GithubRepoModal
+          isOpen={isGithubModalOpen}
+          onClose={() => setIsGithubModalOpen(false)}
+          onRunTest={handleRunStressTest}
+          repos={repos}
+          isLoading={isFetchingRepos}
+        />
+
+        <ABResultStatsModal
+          isOpen={!!selectedResult}
+          onClose={() => setSelectedResult(null)}
+          data={selectedResult}
+        />
       </div>
-
-      {/* Modals */}
-      <WebserverMonitorModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={fetchMonitors}
-      />
-
-      <SurgePredictionModal
-        isOpen={isSurgeModalOpen}
-        onClose={handleCloseSurgeModal}
-        monitor={selectedMonitor}
-        onSaveConfig={handleSaveSurgeConfig}
-        onGenerateReport={handleGenerateReadinessReport}
-        onTriggerCheck={handleTriggerManualCheck}
-      />
-
-      <GithubRepoModal
-        isOpen={isGithubModalOpen}
-        onClose={() => setIsGithubModalOpen(false)}
-        repos={repos}
-        isFetching={isFetchingRepos}
-        onRunTest={handleRunStressTest}
-      />
-
-      <ABResultStatsModal
-        isOpen={!!selectedResult}
-        onClose={() => setSelectedResult(null)}
-        data={selectedResult}
-      />
     </div>
   );
 }
