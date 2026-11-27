@@ -223,9 +223,11 @@ export default function Page() {
     try {
       const res = await fetch("/api/github/repos");
       const data = await res.json();
-      setRepos(data.repos || []);
+      // GitHub API returns array directly, not { repos: [...] }
+      setRepos(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to fetch repos:", err);
+      setRepos([]);
     } finally {
       setIsFetchingRepos(false);
     }
