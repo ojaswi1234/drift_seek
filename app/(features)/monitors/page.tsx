@@ -10,7 +10,7 @@ import GlobalLoader from "@/components/GlobalLoader";
 import GithubRepoModal, { GitHubRepo } from "@/components/modals/githubRepos/githubrepoModal";
 import ABResultStatsModal, { ABResultData } from "@/components/modals/results/ABResultStatsModal";
 import { io, Socket } from "socket.io-client";
-import { Activity, Eye, RefreshCw, GitFork, GitBranch } from "lucide-react";
+import { Activity, Eye, RefreshCw, GitFork, GitBranch, GitCompare } from "lucide-react";
 
 type MonitorSocketPayload = {
   id: string;
@@ -216,7 +216,7 @@ export default function Page() {
     }
   };
 
-  // --- GITHUB REPO / STRESS ENGINE LOGIC ---
+  // --- GITHUB REPO / A/B TEST ENGINE LOGIC ---
   const handleOpenGithubModal = async () => {
     setIsGithubModalOpen(true);
     setIsFetchingRepos(true);
@@ -233,7 +233,7 @@ export default function Page() {
     }
   };
 
-  const handleRunStressTest = async (githubUrl: string, branches?: string[]) => {
+  const handleRunABTest = async (githubUrl: string, branches?: string[]) => {
     setIsGithubModalOpen(false);
     setIsEngineRunning(true);
     setEngineTarget(githubUrl);
@@ -248,11 +248,11 @@ export default function Page() {
       
       if (!res.ok) {
         const errData = await res.json();
-        throw new Error(errData.message || "Failed to trigger stress test");
+        throw new Error(errData.message || "Failed to trigger A/B test");
       }
       
       const data = await res.json();
-      console.log("Stress test triggered:", data);
+      console.log("A/B test triggered:", data);
       
       // Start polling for results
       startPolling(githubUrl);
@@ -315,7 +315,7 @@ export default function Page() {
               System Monitors
             </h1>
             <p className="mt-1 text-sm text-gray-500">
-              Real-time infrastructure monitoring & stress testing
+              Real-time infrastructure monitoring & A/B testing
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -330,8 +330,8 @@ export default function Page() {
               className="px-4 py-2 bg-black text-white text-sm font-mono uppercase tracking-wider rounded-lg hover:bg-zinc-800 transition-colors flex items-center gap-2"
               disabled={isEngineRunning}
             >
-              <GitFork className="w-4 h-4" />
-              Stress Test
+              <GitCompare className="w-4 h-4" />
+              A/B Test
             </button>
             <button
               onClick={() => setIsModalOpen(true)}
@@ -399,11 +399,11 @@ export default function Page() {
             </div>
           </div>
 
-          {/* Stress Engine Results Panel */}
+          {/* A/B Test Engine Results Panel */}
           <aside className="bg-white border border-gray-100 rounded-xl p-6 flex flex-col h-[600px]">
             <div className="flex items-center justify-between mb-6 shrink-0">
               <h2 className="text-lg font-bold font-orbitron tracking-wide text-gray-900">
-                Stress Engine
+                A/B Test Engine
               </h2>
               {isEngineRunning && (
                 <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -424,7 +424,7 @@ export default function Page() {
                 <div className="text-center py-12 text-gray-400">
                   <GitBranch className="w-12 h-12 mx-auto mb-3 opacity-50" />
                   <p className="text-sm">No test results yet</p>
-                  <p className="text-xs mt-1">Run a stress test to see results</p>
+                  <p className="text-xs mt-1">Run an A/B test to see results</p>
                 </div>
               ) : (
                 container.map((item) => (
@@ -500,7 +500,7 @@ export default function Page() {
         <GithubRepoModal
           isOpen={isGithubModalOpen}
           onClose={() => setIsGithubModalOpen(false)}
-          onRunTest={handleRunStressTest}
+          onRunTest={handleRunABTest}
           repos={repos}
           isLoading={isFetchingRepos}
         />
