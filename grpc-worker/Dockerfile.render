@@ -1,0 +1,20 @@
+# Render-compatible Dockerfile for gRPC worker
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY grpc-worker/package*.json ./
+RUN npm install --omit=dev
+
+# Copy application code and protos
+COPY grpc-worker/ ./grpc-worker/
+COPY protos/ ./protos/
+
+WORKDIR /app/grpc-worker
+
+# Expose gRPC port
+EXPOSE 50051
+
+# Start the application
+CMD ["npm", "start"]

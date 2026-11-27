@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Globe, Clock, Trash2, PlayCircle, AlertTriangle } from 'lucide-react';
+import { Activity, Globe, Clock, Trash2, PlayCircle, AlertTriangle, Settings, Zap, ExternalLink } from 'lucide-react';
 
 interface MonitorCardProps {
   id: string;
@@ -11,6 +11,7 @@ interface MonitorCardProps {
   lastChecked?: string;
   onDelete?: (id: string) => void;
   onCheck?: (id: string) => void;
+  onOpenSurgeModal?: (monitor: { id: string; name?: string; url: string }) => void;
 }
 
 const MonitorCard: React.FC<MonitorCardProps> = ({ 
@@ -22,7 +23,8 @@ const MonitorCard: React.FC<MonitorCardProps> = ({
   latency, 
   lastChecked,
   onDelete,
-  onCheck
+  onCheck,
+  onOpenSurgeModal
 }) => {
   const isOnline = status === 'online' || status === 'up';
   const isError = status === 'offline' || status === 'error' || status === 'down';
@@ -50,11 +52,25 @@ const MonitorCard: React.FC<MonitorCardProps> = ({
     }
   };
 
-
-
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't open modal if clicking on interactive elements
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('a') ||
+      target.closest('button') ||
+      target.tagName === 'BUTTON' ||
+      target.tagName === 'A'
+    ) {
+      return;
+    }
+    onOpenSurgeModal?.({ id, name, url });
+  };
 
   return (
-    <div className={`group relative w-full p-5 bg-white border ${borderColor} shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-300 rounded-lg`}>
+    <div 
+      className={`group relative w-full p-5 bg-white border ${borderColor} shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-300 rounded-lg cursor-pointer`}
+      onClick={handleCardClick}
+    >
       
       {/* Top Bar: Status Icon & URL */}
       <div className="flex justify-between items-start mb-4">
@@ -73,6 +89,7 @@ const MonitorCard: React.FC<MonitorCardProps> = ({
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="truncate hover:underline decoration-gray-400 underline-offset-2"
+                onClick={(e) => e.stopPropagation()}
               >
                 {url}
               </a>
@@ -109,28 +126,51 @@ const MonitorCard: React.FC<MonitorCardProps> = ({
         </div>
       </div>
 
-      {/* Action Footer */}
-      <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
-        <button 
-          onClick={() => onCheck?.(id)}
-          className="flex items-center gap-2 px-4 py-1.5 text-[11px] bg-gray-50 text-gray-700 hover:text-black hover:bg-gray-200 transition-all font-mono uppercase tracking-wide border border-gray-200 rounded-md"
-          title="Manual Ping Check"
-        >
-          <PlayCircle size={14} /> Test
-        </button>
-        <button 
-          onClick={() => deleteTarget(id)}
-          className="flex items-center justify-center w-8 h-8 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"
-          title="Remove Target"
-        >
-          <Trash2 size={16} />
-        </button>
+      {/* Action Buttons */}
+      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onCheck?.(id);
+            }}
+            className="p-2 text-gray-500 hover:text-black hover:bg-gray-100 rounded-lg transition-colors"
+            title="Ping now"
+            aria-label="Ping now"
+          >
+            <PlayCircle size={16} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenSurgeModal?.({ id, name, url });
+            }}
+            className="p-2 text-gray-500 hover:text-black hover:bg-gray-100 rounded-lg transition-colors"
+            title="Surge Prediction & Readiness"
+            aria-label="Surge Prediction & Readiness"
+          >
+            <Zap size={16} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteTarget(id);
+            }}
+            className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            title="Delete monitor"
+            aria-label="Delete monitor"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+        
+        {/* Click hint */}
+        <div className="text-[10px] text-gray-400 font-mono uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">
+          Click card for surge config
+        </div>
       </div>
-
-      {/* Hover Effect Line - Top */}
-      <div className={`absolute top-0 left-0 w-0 h-1 ${isOnline ? 'bg-green-500' : 'bg-red-500'} transition-all duration-500 group-hover:w-full rounded-t-lg`} />
     </div>
   );
-}
+};
 
 export default MonitorCard;

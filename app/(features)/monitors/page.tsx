@@ -3,6 +3,7 @@
 import MonitorCard from "@/components/monitorCard";
 import React, { useEffect, useRef, useState } from "react";
 import WebserverMonitorModal from "@/components/modals/webserver/webserverMonitorModal";
+import SurgePredictionModal from "@/components/modals/webserver/SurgePredictionModal";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import GlobalLoader from "@/components/GlobalLoader";
@@ -20,6 +21,46 @@ type MonitorSocketPayload = {
   lastChecked: string;
 };
 
+interface SurgeConfig {
+  monitorId: string;
+  monitorName: string;
+  monitorUrl: string;
+  events: Array<{
+    id: string;
+    name: string;
+    date: string;
+    type: "festival" | "launch" | "holiday" | "custom";
+    description?: string;
+    enabled: boolean;
+  }>;
+  baselineInterval: number;
+  preEventInterval: number;
+  surgeInterval: number;
+  preEventWindowHours: number;
+  surgeWindowHours: number;
+  telegramEnabled: boolean;
+  readinessChecks: {
+    cdn: boolean;
+    compression: boolean;
+    protocol: boolean;
+    cacheHeaders: boolean;
+    sslExpiry: boolean;
+  };
+}
+
+interface ReadinessReport {
+  score: number;
+  checks: Array<{
+    name: string;
+    passed: boolean;
+    message: string;
+    severity: "info" | "warning" | "critical";
+  }>;
+  recommendations: string[];
+  predictedPeakMultiplier?: number;
+  crashProbability?: number;
+}
+
 export default function Page() {
   // Existing WebServer State
   const [website, setWebsite] = useState([] as any[]);
@@ -27,6 +68,10 @@ export default function Page() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const socketRef = React.useRef<Socket | null>(null);
+
+  // Surge Prediction Modal State
+  const [isSurgeModalOpen, setIsSurgeModalOpen] = useState(false);
+  const [selectedMonitor, setSelectedMonitor] = useState<{ id: string; name?: string; url: string } | null>(null);
 
   // New Container/Stress Engine State
   const [container, setContainer] = useState([] as ABResultData[]);
@@ -108,48 +153,68 @@ export default function Page() {
   const getLatestTestTimestamp = (results: ABResultData[], githubUrl: string) => {
     return results
       .filter((result) => result.githubUrl === githubUrl)
-      .reduce((latest, result) => {
-        const testedAt = new Date(result.testedAt).getTime();
-        return testedAt > latest ? testedAt : latest;
-      }, 0);
+      .reduce((max, result) => Math.max(max, new Date(result.testedAt).getTime()), 0);
   };
 
   const stopPollingForResults = () => {
-    if (pollingIntervalRef.current !== null) {
-      window.clearInterval(pollingIntervalRef.current);
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
-
-    if (pollingTimeoutRef.current !== null) {
-      window.clearTimeout(pollingTimeoutRef.current);
+    if (pollingTimeoutRef.current) {
+      clearTimeout(pollingTimeoutRef.current);
       pollingTimeoutRef.current = null;
     }
-
     pollingTargetRef.current = null;
-    pollingBaselineRef.current = 0;
     setIsEngineRunning(false);
     setEngineTarget(null);
   };
 
-  React.useEffect(() => {
-    if (status === "authenticated") {
-      fetchMonitors();
-      fetchContainerResults(); // Load historical results on mount
+  // --- SURGE PREDICTION API CALLS ---
+  const handleSaveSurgeConfig = async (monitorId: string, config: Partial<SurgeConfig>) => {
+    const res = await fetch(`/api/monitor/${monitorId}/surge-config`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(config),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || "Failed to save surge config");
     }
-  }, [status]);
+  };
 
-  useEffect(() => {
-    return () => {
-      if (pollingIntervalRef.current !== null) {
-        window.clearInterval(pollingIntervalRef.current);
-      }
+  const handleGenerateReadinessReport = async (monitorId: string): Promise<ReadinessReport | null> => {
+    const res = await fetch(`/api/monitor/${monitorId}/readiness-report`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || "Failed to generate readiness report");
+    }
+    return res.json();
+  };
 
-      if (pollingTimeoutRef.current !== null) {
-        window.clearTimeout(pollingTimeoutRef.current);
-      }
-    };
-  }, []);
+  const handleTriggerManualCheck = async (monitorId: string) => {
+    const res = await fetch(`/api/monitor/${monitorId}/trigger-check`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || "Failed to trigger check");
+    }
+  };
 
+  const handleOpenSurgeModal = (monitor: { id: string; name?: string; url: string }) => {
+    setSelectedMonitor(monitor);
+    setIsSurgeModalOpen(true);
+  };
+
+  const handleCloseSurgeModal = () => {
+    setIsSurgeModalOpen(false);
+    setSelectedMonitor(null);
+  };
+
+  // --- SOCKET CONNECTION ---
   React.useEffect(() => {
     if (status !== "authenticated") return;
 
@@ -349,6 +414,7 @@ export default function Page() {
                       body: JSON.stringify({ id }),
                     }).finally(() => fetchMonitors());
                   }}
+                  onOpenSurgeModal={handleOpenSurgeModal}
                 />
               ))}
             </div>
@@ -399,65 +465,94 @@ export default function Page() {
           ) : container.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center min-h-62.5 border-2 border-dashed border-gray-200 rounded-lg p-6">
               <p className="text-gray-400 text-center">
-                Monitor Containers in an isolated environment.<br/>
-                <span className="text-sm">Click "+ Add Container" to stress test a repo.</span>
+                Add a GitHub repository to run A/B performance tests
               </p>
             </div>
           ) : (
             <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-10 scrollbtn">
               {container.map((item, index) => (
-                <ContainerMetricCard key={index} data={item} onOpenStats={(result) => setSelectedResult(result)} />
+                <div key={index} className="group relative p-5 bg-white border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-300 rounded-lg">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="p-2 rounded-md bg-purple-50 text-purple-600 shrink-0">
+                        <Activity size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-black font-orbitron font-bold tracking-wide text-sm truncate">
+                          {item.githubUrl.split("/").slice(-2).join("/")}
+                        </h3>
+                        <p className="text-gray-500 text-[11px] font-mono mt-1 truncate">
+                          {item.githubUrl}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="px-2 py-1 rounded text-[10px] font-mono font-bold border border-purple-200 bg-purple-50 text-purple-700 uppercase tracking-widest">
+                      A/B Test
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-px bg-gray-100 border border-gray-100 overflow-hidden rounded-md my-4">
+                    <div className="bg-white p-3 flex flex-col justify-center">
+                      <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-1">Branch A</span>
+                      <span className="text-lg font-bold font-orbitron text-black">
+                        {item.metrics.branchA?.name || "N/A"}
+                      </span>
+                    </div>
+                    <div className="bg-white p-3 flex flex-col justify-center">
+                      <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-1">Branch B</span>
+                      <span className="text-lg font-bold font-orbitron text-black">
+                        {item.metrics.branchB?.name || "N/A"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                    <button
+                      onClick={() => setSelectedResult(item)}
+                      className="px-3 py-1.5 text-xs font-mono bg-black text-white rounded hover:bg-zinc-800 transition-colors"
+                    >
+                      View Details
+                    </button>
+                    <span className="text-[10px] text-gray-400 font-mono">
+                      {new Date(item.testedAt).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
               ))}
             </div>
           )}
         </aside>
       </div>
 
-      {/* MODALS */}
-      <GithubRepoModal 
-        isOpen={isGithubModalOpen} 
-        onClose={() => setIsGithubModalOpen(false)} 
-        repos={repos}
-        isLoading={isFetchingRepos}
-        onSelectRepo={(url, branches) => handleRunStressTest(url, branches)} 
-      />
-      
-      <WebserverMonitorModal 
-        isOpen={isModalOpen} 
+      {/* Modals */}
+      <WebserverMonitorModal
+        isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={() => {
-          setIsModalOpen(false);
-          fetchMonitors();
-        }}
+        onSuccess={fetchMonitors}
+      />
+
+      <SurgePredictionModal
+        isOpen={isSurgeModalOpen}
+        onClose={handleCloseSurgeModal}
+        monitor={selectedMonitor}
+        onSaveConfig={handleSaveSurgeConfig}
+        onGenerateReport={handleGenerateReadinessReport}
+        onTriggerCheck={handleTriggerManualCheck}
+      />
+
+      <GithubRepoModal
+        isOpen={isGithubModalOpen}
+        onClose={() => setIsGithubModalOpen(false)}
+        repos={repos}
+        isFetching={isFetchingRepos}
+        onRunTest={handleRunStressTest}
       />
 
       <ABResultStatsModal
-        isOpen={Boolean(selectedResult)}
+        isOpen={!!selectedResult}
         onClose={() => setSelectedResult(null)}
         data={selectedResult}
       />
-    </div>
-  );
-}
-
-// Sub-component to render the pipeline results cleanly in the light theme
-function ContainerMetricCard({ data, onOpenStats }: { data: ABResultData; onOpenStats: (data: ABResultData) => void }) {
-  const { githubUrl } = data;
-
-  return (
-    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 shadow-sm font-sans mb-4">
-      <div className="flex items-center justify-between gap-4">
-        <h3 className="font-bold text-gray-900 truncate font-mono text-sm" title={githubUrl}>
-          {githubUrl.replace("https://github.com/", "")}
-        </h3>
-        <button
-          onClick={() => onOpenStats(data)}
-          className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-300 bg-white hover:bg-gray-100 text-xs font-bold uppercase tracking-wider transition-colors"
-        >
-          <Eye size={14} />
-          View Stats
-        </button>
-      </div>
     </div>
   );
 }

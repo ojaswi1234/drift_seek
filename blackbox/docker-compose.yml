@@ -1,0 +1,89 @@
+# Blackbox Exporter Monitoring Stack for DriftSeeker
+# Run with: docker-compose -f blackbox/docker-compose.yml up -d
+
+services:
+  # Blackbox Exporter - stateless prober
+  blackbox-exporter:
+    build:
+      context: ./blackbox
+      dockerfile: Dockerfile
+    container_name: driftseeker-blackbox
+    restart: unless-stopped
+    ports:
+      - "9115:9115"
+    volumes:
+      - ./blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9115/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Metrics Collector - stores probe results in MongoDB
+  metrics-collector:
+    build:
+      context: ./blackbox/metrics-collector
+      dockerfile: Dockerfile
+    container_name: driftseeker-metrics-collector
+    restart: unless-stopped
+    ports:
+      - "9116:9116"
+    environment:
+      - BLACKBOX_URL=http://blackbox-exporter:9115
+      - MONGODB_URI=mongodb://mongo:27017
+      - DB_NAME=system_seek
+      - COLLECTION_INTERVAL=60000
+      - APP_URL=http://app:3000
+      - TERMINAL_URL=http://terminal-server:3001
+      - GRPC_URL=grpc-worker:50051
+      - MONGO_URL=mongo:27017
+      - REDIS_URL=redis:6379
+    depends_on:
+      - blackbox-exporter
+      - mongo
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9116/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # MongoDB for metrics storage
+  mongo:
+    image: mongo:7
+    container_name: driftseeker-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "mongodb://localhost:27017/admin", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: driftseeker-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongo-data:
+  redis-data:
+
+networks:
+  default:
+    name: driftseeker-monitoring

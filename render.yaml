@@ -1,0 +1,121 @@
+services:
+  # gRPC Worker Service
+  - type: worker
+    name: driftseeker-grpc-worker
+    env: docker
+    dockerfilePath: ./grpc-worker/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "50051"
+    healthCheckPath: /health
+    autoDeploy: true
+
+  # Terminal Server Service
+  - type: web
+    name: driftseeker-terminal-server
+    env: docker
+    dockerfilePath: ./terminal-server/Dockerfile
+    dockerContext: ./terminal-server
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3001"
+      - key: GRPC_PORT
+        value: "50052"
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://driftseeker-app.onrender.com
+    healthCheckPath: /
+    autoDeploy: true
+    # Note: Docker socket access not available on Render free tier
+    # For production, consider using a separate Docker host or Render's native services
+
+  # Main Next.js App
+  - type: web
+    name: driftseeker-app
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: NEXTAUTH_URL
+        value: https://driftseeker-app.onrender.com/api/auth/callback/github
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://driftseeker-app.onrender.com
+      - key: NEXT_PUBLIC_SERVER_BASE_URL
+        value: https://driftseeker-terminal-server.onrender.com
+      - key: MONGODB_URI
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: NEXTAUTH_SECRET
+        sync: false
+      - key: GITHUB_ID
+        sync: false
+      - key: GITHUB_SECRET
+        sync: false
+      - key: GRPC_WORKER_URL
+        value: driftseeker-grpc-worker:50051
+    healthCheckPath: /api/health
+    autoDeploy: true
+
+  # Blackbox Exporter - Stateless prober for monitoring
+  - type: web
+    name: driftseeker-blackbox
+    env: docker
+    dockerfilePath: ./blackbox/Dockerfile
+    dockerContext: ./blackbox
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /health
+    autoDeploy: true
+
+  # Metrics Collector - Stores Blackbox probe results in MongoDB
+  - type: web
+    name: driftseeker-metrics-collector
+    env: docker
+    dockerfilePath: ./blackbox/metrics-collector/Dockerfile
+    dockerContext: ./blackbox/metrics-collector
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "9116"
+      - key: BLACKBOX_URL
+        value: https://driftseeker-blackbox.onrender.com
+      - key: MONGODB_URI
+        sync: false
+      - key: DB_NAME
+        value: system_seek
+      - key: COLLECTION_INTERVAL
+        value: "60000"
+      - key: APP_URL
+        value: https://driftseeker-app.onrender.com
+      - key: TERMINAL_URL
+        value: https://driftseeker-terminal-server.onrender.com
+      - key: GRPC_URL
+        value: driftseeker-grpc-worker:50051
+    healthCheckPath: /health
+    autoDeploy: true
+
+databases:
+  - name: driftseeker-mongo
+    databaseName: system_seek
+    plan: free
+    ipAllowList: []
+
+  - name: driftseeker-redis
+    plan: free
+    ipAllowList: []

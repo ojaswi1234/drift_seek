@@ -1,0 +1,27 @@
+# Render-compatible Dockerfile for terminal-server
+# This version doesn't require Docker socket access
+FROM node:20-alpine
+
+WORKDIR /terminal-server
+
+# Install build dependencies for native modules (node-pty)
+RUN apk add --no-cache python3 make g++ linux-headers
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install --omit=dev
+
+# Copy application code
+COPY . .
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=3001
+
+# Expose the port the app runs on
+EXPOSE 3001
+
+# Start the application
+CMD ["npm", "start"]

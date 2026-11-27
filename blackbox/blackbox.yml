@@ -1,0 +1,98 @@
+# Blackbox Exporter Configuration for DriftSeeker
+# This configures probing endpoints for the monitoring system
+
+modules:
+  # HTTP/HTTPS probing for web services
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2"]
+      valid_status_codes: [200, 201, 202, 204]
+      method: GET
+      follow_redirects: true
+      no_follow_redirects: false
+      fail_if_ssl: false
+      fail_if_not_ssl: false
+      tls_config:
+        insecure_skip_verify: false
+      headers:
+        User-Agent: "DriftSeeker-Blackbox/1.0"
+
+  # HTTP POST probing for API endpoints
+  http_post_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2"]
+      valid_status_codes: [200, 201, 202, 204]
+      method: POST
+      follow_redirects: true
+      headers:
+        User-Agent: "DriftSeeker-Blackbox/1.0"
+        Content-Type: "application/json"
+
+  # TCP probing for gRPC services
+  grpc_health:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      query_response:
+        - expect: "^\\x00\\x00\\x00\\x00\\x00"
+          send: "\\x00\\x00\\x00\\x00\\x00"
+
+  # TCP probing for MongoDB
+  mongodb:
+    prober: tcp
+    timeout: 5s
+
+  # TCP probing for Redis
+  redis:
+    prober: tcp
+    timeout: 5s
+
+  # ICMP probing (ping) - requires NET_RAW capability
+  icmp:
+    prober: icmp
+    timeout: 5s
+    icmp:
+      preferred_ip_protocol: "ip4"
+
+  # DNS probing
+  dns_tcp:
+    prober: dns
+    timeout: 5s
+    dns:
+      transport_protocol: "tcp"
+      query_name: "google.com"
+      query_type: "A"
+
+  dns_udp:
+    prober: dns
+    timeout: 5s
+    dns:
+      transport_protocol: "udp"
+      query_name: "google.com"
+      query_type: "A"
+
+  # gRPC health check probing
+  grpc:
+    prober: grpc
+    timeout: 5s
+    grpc:
+      service: "driftseeker.monitoring.MonitoringEngine"
+      tls: false
+
+  # WebSocket probing
+  websocket:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2"]
+      valid_status_codes: [101]
+      method: GET
+      headers:
+        Upgrade: "websocket"
+        Connection: "Upgrade"
+        Sec-WebSocket-Version: "13"
+        Sec-WebSocket-Key: "dGhlIHNhbXBsZSBub25jZQ=="
