@@ -58,35 +58,6 @@ modules:
       headers:
         User-Agent: "DriftSeeker-Blackbox/1.0"
 
-  # Fast burst HTTP/HTTPS probe used for adaptive Baseline (5m) and Surge (15s) scraping
-  http_surge_probe:
-    prober: http
-    timeout: 10s
-    http:
-      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
-      valid_status_codes: [200, 201, 202, 204, 301, 302]
-      method: GET
-      preferred_ip_protocol: "ip4"
-      follow_redirects: true
-      tls_config:
-        insecure_skip_verify: false
-      headers:
-        User-Agent: "DriftSeeker-SurgeProbe/1.0"
-
-  # Pre-event deep readiness probe (requests compressed encodings & inspects headers)
-  http_readiness_audit:
-    prober: http
-    timeout: 15s
-    http:
-      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
-      method: GET
-      preferred_ip_protocol: "ip4"
-      follow_redirects: true
-      headers:
-        Accept-Encoding: "gzip, br"
-        User-Agent: "DriftSeek-ReadinessBot/1.0"
-        Content-Type: "application/json"
-
   # TCP probing for gRPC services
   grpc_health:
     prober: tcp

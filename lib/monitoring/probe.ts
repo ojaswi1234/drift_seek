@@ -251,9 +251,15 @@ export async function probeTargetWithBlackbox(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
 
+  const headers: Record<string, string> = { Accept: 'text/plain' };
+  const apiToken = (process.env.BLACKBOX_API_TOKEN || process.env.METRICS_API_TOKEN || '').trim();
+  if (apiToken) {
+    headers.Authorization = `Bearer ${apiToken}`;
+  }
+
   try {
     const res = await fetch(endpoint, {
-      headers: { Accept: 'text/plain' },
+      headers,
       cache: 'no-store',
       signal: controller.signal,
     });
