@@ -1,22 +1,24 @@
+# Render Dockerfile for gRPC worker (Build context: grpc-worker)
 FROM node:20-alpine AS builder
 
-WORKDIR /app/grpc-worker
-COPY grpc-worker/package*.json ./
+WORKDIR /app
+COPY package*.json ./
 RUN npm install
 
-COPY grpc-worker/ ./
+COPY . .
 RUN npm run build
 
 FROM node:20-alpine
 
-WORKDIR /app/grpc-worker
-COPY grpc-worker/package*.json ./
+WORKDIR /app
+COPY package*.json ./
 RUN npm install --omit=dev
 
-COPY --from=builder /app/grpc-worker/dist ./dist
-COPY protos/ /app/protos/
+COPY --from=builder /app/dist ./dist
+COPY protos ./protos
 
 ENV NODE_ENV=production
 EXPOSE 50051
+EXPOSE 8080
 
 CMD ["npm", "start"]

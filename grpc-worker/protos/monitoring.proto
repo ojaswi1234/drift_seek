@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package driftseeker.monitoring;
+
+service MonitoringEngine {
+  rpc CheckTarget (TargetRequest) returns (TargetResult);
+}
+
+message TargetRequest {
+  string url = 1;
+}
+
+message TargetResult {
+  string status = 1; // "up" | "down"
+  int32 latency_ms = 2;
+  string reason = 3;
+}

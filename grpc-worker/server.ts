@@ -1,12 +1,30 @@
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import dns from 'node:dns/promises';
+import fs from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
 
-const MONITORING_PROTO_PATH = path.resolve(__dirname, '../protos/monitoring.proto');
-const HEALTH_PROTO_PATH = path.resolve(__dirname, '../protos/health.proto');
+function findProtoPath(protoFileName: string): string {
+  const candidates = [
+    path.resolve(__dirname, './protos', protoFileName),
+    path.resolve(__dirname, '../protos', protoFileName),
+    path.resolve(__dirname, '../../protos', protoFileName),
+    path.resolve(process.cwd(), 'protos', protoFileName),
+    path.resolve(process.cwd(), 'grpc-worker/protos', protoFileName),
+    path.resolve('/app/protos', protoFileName),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return path.resolve(__dirname, '../protos', protoFileName);
+}
+
+const MONITORING_PROTO_PATH = findProtoPath('monitoring.proto');
+const HEALTH_PROTO_PATH = findProtoPath('health.proto');
 
 const monitoringPkgDef = protoLoader.loadSync(MONITORING_PROTO_PATH, {
   keepCase: true,
