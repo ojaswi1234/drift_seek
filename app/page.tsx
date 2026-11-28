@@ -29,15 +29,17 @@ export default function Home() {
       icon: <Search size={28} strokeWidth={1.5} />,
       title: "Drift Detection Engine",
       href: "/drift",
+      maintenance: true,
       content:
-        "Automatically compares live Docker container configs against your official GitHub Dockerfile or Compose spec to flag manual hotfixes.",
+        "Automatically compares live Docker container env vars, resource limits, and ports against your official GitHub Dockerfile or Compose spec to flag manual hotfixes.",
     },
     {
       icon: <Terminal size={28} strokeWidth={1.5} />,
       title: "Integrated Web Shell",
       href: "/console",
+      maintenance: true,
       content:
-        "Secure, in-browser terminal access allowing immediate remediation of server issues without external SSH clients.",
+        "Secure, in-browser sandboxed bash workspace with multi-tab sessions and Team mode collaboration for live issue remediation without external SSH clients.",
     },
     {
       icon: <Zap size={28} strokeWidth={1.5} />,
@@ -136,13 +138,20 @@ export default function Home() {
               >
                 <div className="absolute top-0 left-0 h-0.5 w-12 bg-zinc-100 transition-all duration-300 group-hover:w-full" />
 
-                <div className="flex justify-between items-start mb-8">
+                <div className="flex justify-between items-start gap-2 mb-8">
                   <span className="text-[10px] font-mono text-zinc-500 group-hover:text-zinc-300">
                     SYS.{String(index + 1).padStart(2, "0")}
                   </span>
-                  <span className="text-zinc-600 group-hover:text-zinc-300 transition-colors duration-300 text-lg" aria-hidden="true">
-                    &#x2197;
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {card.maintenance && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/40">
+                        Maintenance Undergoing
+                      </span>
+                    )}
+                    <span className="text-zinc-600 group-hover:text-zinc-300 transition-colors duration-300 text-lg" aria-hidden="true">
+                      &#x2197;
+                    </span>
+                  </div>
                 </div>
 
                 <div className="mb-5 text-zinc-400 group-hover:text-zinc-100 transition-colors duration-300">

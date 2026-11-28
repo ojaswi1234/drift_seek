@@ -38,6 +38,10 @@ interface SurgeConfig {
   preEventWindowHours: number;
   surgeWindowHours: number;
   telegramEnabled: boolean;
+  actionOnlyOnScheduledDays: boolean;
+  activeDaysOfWeek: number[];
+  autoReadinessAlert: boolean;
+  useBlackboxProbe: boolean;
   readinessChecks: {
     cdn: boolean;
     compression: boolean;
@@ -45,6 +49,26 @@ interface SurgeConfig {
     cacheHeaders: boolean;
     sslExpiry: boolean;
   };
+}
+
+interface TelemetrySummary {
+  sampleCount: number;
+  baselineTtfbMs: number | null;
+  recentTtfbMs: number | null;
+  jitterMs: number | null;
+  p95LatencyMs: number | null;
+  errorRatePercent: number;
+  ttfbGrowthRatio: number | null;
+  lastCacheStatus: string;
+  telemetrySource: "prometheus" | "blackbox" | "mongodb-history" | "heuristic";
+  recentSamples: Array<{
+    timestamp: string;
+    latencyMs: number;
+    ttfbMs: number;
+    status: "up" | "down";
+    mode: string;
+    cacheStatus: string;
+  }>;
 }
 
 interface ReadinessReport {
@@ -58,6 +82,8 @@ interface ReadinessReport {
   recommendations: string[];
   predictedPeakMultiplier?: number;
   crashProbability?: number;
+  forecastBasis?: "historical-telemetry" | "heuristic";
+  telemetry?: TelemetrySummary;
 }
 
 interface Monitor {
@@ -115,6 +141,10 @@ function createDefaultConfig(monitor?: Monitor | null): SurgeConfig {
     preEventWindowHours: 24,
     surgeWindowHours: 24,
     telegramEnabled: true,
+    actionOnlyOnScheduledDays: false,
+    activeDaysOfWeek: [],
+    autoReadinessAlert: true,
+    useBlackboxProbe: true,
     readinessChecks: {
       cdn: true,
       compression: true,
@@ -124,6 +154,16 @@ function createDefaultConfig(monitor?: Monitor | null): SurgeConfig {
     },
   };
 }
+
+const WEEK_DAYS = [
+  { value: 0, label: "Sun" },
+  { value: 1, label: "Mon" },
+  { value: 2, label: "Tue" },
+  { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" },
+  { value: 5, label: "Fri" },
+  { value: 6, label: "Sat" },
+];
 
 export default function SurgePredictionModal({
   isOpen,
@@ -136,6 +176,11 @@ export default function SurgePredictionModal({
   const [activeTab, setActiveTab] = useState<"config" | "readiness" | "timeline">("config");
   const [config, setConfig] = useState<SurgeConfig>(() => createDefaultConfig(monitor));
   const [report, setReport] = useState<ReadinessReport | null>(null);
+  const [telemetryPreview, setTelemetryPreview] = useState<TelemetrySummary | null>(null);
+  const [integrations, setIntegrations] = useState<{
+    blackboxConfigured: boolean;
+    prometheusConfigured: boolean;
+  }>({ blackboxConfigured: false, prometheusConfigured: false });
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
@@ -185,6 +230,12 @@ export default function SurgePredictionModal({
             monitorId: monitor.id,
             monitorName: monitor.name || "",
             monitorUrl: monitor.url,
+            activeDaysOfWeek: Array.isArray(data.config.activeDaysOfWeek)
+              ? data.config.activeDaysOfWeek
+              : [],
+            actionOnlyOnScheduledDays: Boolean(data.config.actionOnlyOnScheduledDays),
+            autoReadinessAlert: data.config.autoReadinessAlert ?? true,
+            useBlackboxProbe: data.config.useBlackboxProbe ?? true,
             events: Array.isArray(data.config.events)
               ? data.config.events.map((e: any) => ({
                   ...e,
@@ -195,6 +246,12 @@ export default function SurgePredictionModal({
           if (data.config.lastReadinessReport?.report) {
             setReport(data.config.lastReadinessReport.report);
           }
+        }
+        if (data.telemetry) {
+          setTelemetryPreview(data.telemetry);
+        }
+        if (data.integrations) {
+          setIntegrations(data.integrations);
         }
       } catch (err: any) {
         if (err?.name !== "AbortError") {
@@ -219,6 +276,7 @@ export default function SurgePredictionModal({
 
     setConfig(createDefaultConfig(monitor));
     setReport(null);
+    setTelemetryPreview(null);
     setError(null);
     setSuccess(null);
     setActiveTab("config");
@@ -558,22 +616,132 @@ export default function SurgePredictionModal({
                 </div>
               </div>
 
-              <div className="bg-gray-50 rounded-xl p-5 border border-gray-100">
-                <h3 className="font-orbitron font-bold text-lg text-black mb-4 flex items-center gap-2">
-                  <Bell className="text-black" size={20} />
-                  Notifications
-                </h3>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={config.telegramEnabled}
-                    onChange={(e) =>
-                      setConfig((prev) => ({ ...prev, telegramEnabled: e.target.checked }))
-                    }
-                    className="w-4 h-4 accent-black rounded border-gray-300 focus:ring-black"
-                  />
-                  <span className="text-sm text-gray-700">Send Telegram alerts for status changes</span>
-                </label>
+              <div className="bg-gray-50 rounded-xl p-5 border border-gray-100 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-orbitron font-bold text-lg text-black flex items-center gap-2">
+                    <Bell className="text-black" size={20} />
+                    Notifications &amp; Active Days
+                  </h3>
+                  <div className="flex items-center gap-2 text-[10px] font-mono">
+                    <span
+                      className={`px-2 py-0.5 rounded border ${
+                        integrations.blackboxConfigured
+                          ? "bg-green-100 text-green-700 border-green-200"
+                          : "bg-gray-100 text-gray-600 border-gray-200"
+                      }`}
+                    >
+                      Blackbox: {integrations.blackboxConfigured ? "Connected" : "Fallback HTTP"}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded border ${
+                        integrations.prometheusConfigured
+                          ? "bg-green-100 text-green-700 border-green-200"
+                          : "bg-gray-100 text-gray-600 border-gray-200"
+                      }`}
+                    >
+                      Prometheus: {integrations.prometheusConfigured ? "Connected" : "Mongo History"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={config.telegramEnabled}
+                      onChange={(e) =>
+                        setConfig((prev) => ({ ...prev, telegramEnabled: e.target.checked }))
+                      }
+                      className="w-4 h-4 accent-black rounded border-gray-300 focus:ring-black"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Send Telegram alerts for outages &amp; surge briefs
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={config.autoReadinessAlert}
+                      onChange={(e) =>
+                        setConfig((prev) => ({ ...prev, autoReadinessAlert: e.target.checked }))
+                      }
+                      className="w-4 h-4 accent-black rounded border-gray-300 focus:ring-black"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Auto-run Pre-Event Readiness Audit &amp; send Telegram brief before events
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={config.useBlackboxProbe}
+                      onChange={(e) =>
+                        setConfig((prev) => ({ ...prev, useBlackboxProbe: e.target.checked }))
+                      }
+                      className="w-4 h-4 accent-black rounded border-gray-300 focus:ring-black"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Prefer Prometheus Blackbox Exporter phase probing (TTFB / connect / TLS) when configured
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-3 cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={config.actionOnlyOnScheduledDays}
+                      onChange={(e) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          actionOnlyOnScheduledDays: e.target.checked,
+                        }))
+                      }
+                      className="w-4 h-4 mt-0.5 accent-black rounded border-gray-300 focus:ring-black"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">
+                        Run 24/7 silently — take action only on specified days
+                      </span>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Collects baseline TTFB &amp; jitter metrics 24/7, while Telegram alerts and automated
+                        readiness actions only fire on your selected days below or during active Scheduled Events.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="pt-2 border-t border-gray-200/80">
+                  <p className="text-xs font-mono text-gray-600 uppercase tracking-wider mb-2">
+                    Recurring Active Days (UTC)
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {WEEK_DAYS.map((day) => {
+                      const selected = config.activeDaysOfWeek.includes(day.value);
+                      return (
+                        <button
+                          key={day.value}
+                          type="button"
+                          onClick={() =>
+                            setConfig((prev) => ({
+                              ...prev,
+                              activeDaysOfWeek: selected
+                                ? prev.activeDaysOfWeek.filter((d) => d !== day.value)
+                                : [...prev.activeDaysOfWeek, day.value].sort((a, b) => a - b),
+                            }))
+                          }
+                          className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-colors cursor-pointer ${
+                            selected
+                              ? "bg-black text-white border-black"
+                              : "bg-white text-gray-700 border-gray-200 hover:border-gray-400"
+                          }`}
+                        >
+                          {day.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               <div className="bg-gray-50 rounded-xl p-5 border border-gray-100">
@@ -867,11 +1035,18 @@ export default function SurgePredictionModal({
                           : "border-red-200 bg-red-50"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
                       <div>
-                        <p className="text-sm text-gray-500 font-mono uppercase tracking-wider">
-                          Readiness Score
-                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm text-gray-500 font-mono uppercase tracking-wider">
+                            Readiness Score
+                          </p>
+                          <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-white/80 border border-gray-200 text-gray-700">
+                            {report.forecastBasis === "historical-telemetry"
+                              ? "Historical Telemetry Forecast"
+                              : "Header Heuristic Forecast"}
+                          </span>
+                        </div>
                         <p
                           className={`text-5xl font-orbitron font-bold ${
                             report.score >= 80
@@ -912,6 +1087,86 @@ export default function SurgePredictionModal({
                       </div>
                     </div>
                   </div>
+
+                  {(report.telemetry || telemetryPreview) && (() => {
+                    const telemetry = report.telemetry || telemetryPreview!;
+                    const samples = telemetry.recentSamples || [];
+                    const maxLatency = Math.max(100, ...samples.map((s) => s.latencyMs || 0));
+                    return (
+                      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h4 className="font-orbitron font-bold text-xs text-gray-800 uppercase tracking-wider">
+                            24/7 Collected External Telemetry ({telemetry.sampleCount} samples)
+                          </h4>
+                          <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-white border border-gray-200 text-gray-600">
+                            Source: {telemetry.telemetrySource}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          <div className="bg-white p-3 rounded-lg border border-gray-100">
+                            <p className="text-[10px] font-mono text-gray-500 uppercase">Baseline TTFB</p>
+                            <p className="text-base font-bold font-orbitron text-gray-900">
+                              {telemetry.baselineTtfbMs !== null ? `${telemetry.baselineTtfbMs}ms` : "--"}
+                            </p>
+                          </div>
+                          <div className="bg-white p-3 rounded-lg border border-gray-100">
+                            <p className="text-[10px] font-mono text-gray-500 uppercase">Recent TTFB</p>
+                            <p className="text-base font-bold font-orbitron text-gray-900">
+                              {telemetry.recentTtfbMs !== null ? `${telemetry.recentTtfbMs}ms` : "--"}
+                              {telemetry.ttfbGrowthRatio !== null && (
+                                <span className="text-[10px] font-mono text-gray-500 ml-1">
+                                  ({telemetry.ttfbGrowthRatio}x)
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                          <div className="bg-white p-3 rounded-lg border border-gray-100">
+                            <p className="text-[10px] font-mono text-gray-500 uppercase">Jitter (StdDev)</p>
+                            <p className="text-base font-bold font-orbitron text-gray-900">
+                              {telemetry.jitterMs !== null ? `±${telemetry.jitterMs}ms` : "--"}
+                            </p>
+                          </div>
+                          <div className="bg-white p-3 rounded-lg border border-gray-100">
+                            <p className="text-[10px] font-mono text-gray-500 uppercase">
+                              Error % / Cache
+                            </p>
+                            <p className="text-base font-bold font-orbitron text-gray-900">
+                              {telemetry.errorRatePercent}% / {telemetry.lastCacheStatus}
+                            </p>
+                          </div>
+                        </div>
+                        {samples.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-mono text-gray-500 uppercase mb-1.5">
+                              Recent Probe Latency Curve (Last {samples.length} checks)
+                            </p>
+                            <div className="h-14 flex items-end gap-1.5 bg-white p-2 rounded-lg border border-gray-100">
+                              {samples.map((s, idx) => {
+                                const heightPct = Math.max(
+                                  12,
+                                  Math.round(((s.latencyMs || 0) / maxLatency) * 100)
+                                );
+                                return (
+                                  <div
+                                    key={`${s.timestamp}-${idx}`}
+                                    title={`${new Date(s.timestamp).toLocaleString()} • ${s.latencyMs}ms (TTFB ${s.ttfbMs}ms) • ${s.mode}`}
+                                    className={`flex-1 rounded-t transition-all ${
+                                      s.status === "down"
+                                        ? "bg-red-500"
+                                        : s.mode === "surge"
+                                          ? "bg-amber-500"
+                                          : "bg-emerald-500"
+                                    }`}
+                                    style={{ height: `${heightPct}%` }}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   <div>
                     <h4 className="font-orbitron font-bold text-sm text-gray-700 mb-3 uppercase tracking-wider">

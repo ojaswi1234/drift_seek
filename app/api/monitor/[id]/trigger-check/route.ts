@@ -2,55 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db_connect';
 import WebServer from '@/lib/models/WebServer';
 import SurgeConfig from '@/lib/models/SurgeConfig';
+import MonitorMetric from '@/lib/models/MonitorMetric';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import redis from '@/lib/redis';
 import { sendTelegramAlert } from '@/lib/mailer';
 import { objectIdSchema } from '@/lib/validation/schemas';
-import { safeFetchWithRedirects } from '@/lib/security/urlValidator';
+import { probeTargetUnified } from '@/lib/monitoring/probe';
+import { getMonitoringMode } from '@/lib/monitoring/schedule';
 
 export const dynamic = 'force-dynamic';
-
-async function checkTarget(url: string): Promise<{
-  latency: number;
-  status: 'up' | 'down';
-  reason: string;
-  headers: Record<string, string>;
-}> {
-  const start = performance.now();
-  let status: 'up' | 'down' = 'down';
-  let reason = '';
-  const headers: Record<string, string> = {};
-
-  try {
-    const { response } = await safeFetchWithRedirects(url, {
-      method: 'HEAD',
-      timeoutMs: 10000,
-      allowHttp: true,
-      fallbackToGetOn405: true,
-    });
-    await response.body?.cancel().catch(() => {});
-
-    response.headers.forEach((value, key) => {
-      headers[key.toLowerCase()] = value;
-    });
-
-    if (response.ok) {
-      status = 'up';
-    } else {
-      reason = `HTTP ${response.status}`;
-    }
-  } catch (error) {
-    reason =
-      error instanceof Error && error.name === 'AbortError'
-        ? 'Timeout'
-        : error instanceof Error
-          ? error.message
-          : 'Network Failure';
-  }
-
-  return { latency: Math.round(performance.now() - start), status, reason, headers };
-}
 
 export async function POST(
   _req: NextRequest,
@@ -80,18 +41,46 @@ export async function POST(
       ownerEmail: session.user.email,
     });
     const telegramEnabled = surgeConfig?.telegramEnabled ?? false;
+    const preferBlackbox = surgeConfig?.useBlackboxProbe ?? true;
+    const { mode } = getMonitoringMode(surgeConfig);
 
-    const { latency, status, reason, headers } = await checkTarget(server.url);
-    const now = new Date().toISOString();
+    const probe = await probeTargetUnified(server.url, { preferBlackbox });
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    await MonitorMetric.create({
+      monitorId: server._id,
+      url: server.url,
+      ownerEmail: server.ownerEmail,
+      status: probe.status,
+      latencyMs: probe.latencyMs,
+      ttfbMs: probe.ttfbMs,
+      connectMs: probe.connectMs,
+      tlsMs: probe.tlsMs,
+      resolveMs: probe.resolveMs,
+      transferMs: probe.transferMs,
+      httpStatusCode: probe.httpStatusCode,
+      httpVersion: probe.httpVersion,
+      compressed: probe.compressed,
+      cacheStatus: probe.cacheStatus,
+      cdnProvider: probe.cdnProvider,
+      mode,
+      source: probe.source,
+      reason: probe.reason,
+      timestamp: now,
+    }).catch((err) => console.warn('Failed to persist MonitorMetric:', err));
 
     const redisKey = `monitor:stats:${idCheck.data}`;
     try {
       await redis.hset(redisKey, {
-        status,
-        reason,
-        latency: latency.toString(),
-        lastChecked: now,
-        headers: JSON.stringify(headers),
+        status: probe.status,
+        reason: probe.reason,
+        latency: probe.latencyMs.toString(),
+        ttfbMs: probe.ttfbMs.toString(),
+        cacheStatus: probe.cacheStatus,
+        source: probe.source,
+        lastChecked: nowIso,
+        headers: JSON.stringify(probe.headers),
       });
       await redis.expire(redisKey, 3600);
     } catch (redisErr) {
@@ -101,10 +90,12 @@ export async function POST(
     const metricPayload = {
       id: idCheck.data,
       url: server.url,
-      status,
-      latency,
-      reason,
-      lastChecked: now,
+      status: probe.status,
+      latency: probe.latencyMs,
+      ttfbMs: probe.ttfbMs,
+      cacheStatus: probe.cacheStatus,
+      reason: probe.reason,
+      lastChecked: nowIso,
     };
 
     try {
@@ -117,10 +108,14 @@ export async function POST(
       try {
         await sendTelegramAlert({
           url: server.url,
-          reason: reason || (status === 'up' ? 'Target responded normally' : 'Service unreachable'),
+          reason:
+            probe.reason ||
+            (probe.status === 'up'
+              ? `Target responded normally (TTFB: ${probe.ttfbMs}ms, Cache: ${probe.cacheStatus})`
+              : 'Service unreachable'),
           ownerEmail: server.ownerEmail,
-          status,
-          latencyMs: latency,
+          status: probe.status,
+          latencyMs: probe.latencyMs,
           title: `<b>Manual Check: ${server.name}</b>`,
         });
       } catch (telegramErr) {
@@ -134,10 +129,13 @@ export async function POST(
         id: server._id,
         name: server.name,
         url: server.url,
-        status,
-        latency,
-        reason,
-        lastChecked: now,
+        status: probe.status,
+        latency: probe.latencyMs,
+        ttfbMs: probe.ttfbMs,
+        cacheStatus: probe.cacheStatus,
+        source: probe.source,
+        reason: probe.reason,
+        lastChecked: nowIso,
       },
     });
   } catch (err) {

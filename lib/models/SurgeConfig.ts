@@ -36,6 +36,18 @@ const SurgeConfigSchema = new mongoose.Schema({
   preEventWindowHours: { type: Number, default: 24, min: 1, max: 72 },
   surgeWindowHours: { type: Number, default: 24, min: 1, max: 72 },
   telegramEnabled: { type: Boolean, default: true },
+  actionOnlyOnScheduledDays: { type: Boolean, default: false },
+  activeDaysOfWeek: {
+    type: [Number],
+    default: [],
+    validate: {
+      validator: (days: number[]) =>
+        Array.isArray(days) && days.every((d) => Number.isInteger(d) && d >= 0 && d <= 6),
+      message: 'activeDaysOfWeek must contain integers between 0 (Sun) and 6 (Sat)',
+    },
+  },
+  autoReadinessAlert: { type: Boolean, default: true },
+  useBlackboxProbe: { type: Boolean, default: true },
   readinessChecks: { type: ReadinessChecksSchema, default: () => ({}) },
   lastReadinessReport: {
     score: Number,

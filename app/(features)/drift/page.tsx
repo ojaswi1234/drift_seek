@@ -247,12 +247,18 @@ export default function DriftEnginePage() {
   return (
     <div className="min-h-screen w-full bg-gray-50 text-gray-900 font-sans pl-12 sm:pl-16 md:pl-16 lg:pl-18">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold font-orbitron tracking-tight text-gray-900 flex items-center gap-3">
-              <Search className="w-7 h-7" />
-              Drift Detection Engine
-            </h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-bold font-orbitron tracking-tight text-gray-900 flex items-center gap-3">
+                <Search className="w-7 h-7" />
+                Drift Detection Engine
+              </h1>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                Maintenance Undergoing
+              </span>
+            </div>
             <p className="mt-1 text-sm text-gray-500">
               Compare live Docker container configuration & resource limits against your official GitHub repository
             </p>
@@ -266,6 +272,31 @@ export default function DriftEnginePage() {
             <RefreshCw className={`w-4 h-4 ${isLoadingContainers ? "animate-spin" : ""}`} />
             Refresh Docker
           </button>
+        </div>
+
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50/80 p-4 sm:p-5">
+          <div className="flex items-start gap-3">
+            <ShieldAlert className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-sm font-semibold text-amber-950 font-orbitron">
+                  About Drift Detection Engine
+                </h2>
+                <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-amber-200/80 text-amber-900 font-semibold">
+                  Maintenance Undergoing
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-amber-900/90 leading-relaxed">
+                The Drift Detection Engine inspects running Docker containers (environment variables, memory &amp; CPU
+                limits, exposed ports, and base images) and compares them against the official{" "}
+                <code className="px-1 py-0.5 rounded bg-amber-100 font-mono text-xs">Dockerfile</code> or{" "}
+                <code className="px-1 py-0.5 rounded bg-amber-100 font-mono text-xs">docker-compose</code> spec in your
+                GitHub repository to flag unrecorded 2:00 AM manual hotfixes before the next automated deployment wipes
+                them out. Remote Docker daemon connectivity is currently undergoing maintenance—live container scanning
+                requires an active local or remote Docker socket.
+              </p>
+            </div>
+          </div>
         </div>
 
         {!dockerAvailable && (

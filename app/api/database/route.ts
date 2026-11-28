@@ -2,6 +2,7 @@
 import dbConnect from '@/lib/db_connect';
 import WebServer from '@/lib/models/WebServer';
 import SurgeConfig from '@/lib/models/SurgeConfig';
+import MonitorMetric from '@/lib/models/MonitorMetric';
 import { NextRequest, NextResponse } from 'next/server';
 import redis from '@/lib/redis';
 import { getServerSession } from 'next-auth/next';
@@ -21,7 +22,15 @@ export async function GET() {
     }
 
     await dbConnect();
-    const servers = await WebServer.find({ ownerEmail: session.user.email });
+    const [servers, surgeConfigs] = await Promise.all([
+      WebServer.find({ ownerEmail: session.user.email }),
+      SurgeConfig.find({ ownerEmail: session.user.email }).lean(),
+    ]);
+
+    const configByMonitorId = new Map<string, any>();
+    for (const cfg of surgeConfigs) {
+      configByMonitorId.set(String(cfg.monitorId), cfg);
+    }
 
     const serversWithData = await Promise.all(
       servers.map(async (server: any) => {
@@ -34,12 +43,22 @@ export async function GET() {
         }
 
         const parsedLatency = stats.latency !== undefined ? Number(stats.latency) : 0;
+        const parsedTtfb = stats.ttfbMs !== undefined ? Number(stats.ttfbMs) : undefined;
+        const surgeCfg = configByMonitorId.get(String(server._id));
 
         return {
           ...server.toObject(),
           status: stats.status || 'pending',
           reason: stats.reason || 'Awaiting first check',
           latency: Number.isFinite(parsedLatency) ? parsedLatency : 0,
+          ttfbMs: typeof parsedTtfb === 'number' && Number.isFinite(parsedTtfb) ? parsedTtfb : undefined,
+          cacheStatus: stats.cacheStatus || undefined,
+          mode: stats.mode || undefined,
+          actionOnlyOnScheduledDays: Boolean(surgeCfg?.actionOnlyOnScheduledDays),
+          activeDaysOfWeek: Array.isArray(surgeCfg?.activeDaysOfWeek) ? surgeCfg.activeDaysOfWeek : [],
+          scheduledEventCount: Array.isArray(surgeCfg?.events)
+            ? surgeCfg.events.filter((e: any) => e?.enabled).length
+            : 0,
           lastChecked: stats.lastChecked || server.updatedAt,
         };
       })
@@ -173,9 +192,14 @@ export async function DELETE(req: NextRequest): Promise<Response> {
     }
 
     await WebServer.findByIdAndDelete(validatedId);
-    await SurgeConfig.deleteOne({ monitorId: validatedId }).catch((err) =>
-      console.warn(`Failed to delete SurgeConfig for ${validatedId}:`, err)
-    );
+    await Promise.all([
+      SurgeConfig.deleteOne({ monitorId: validatedId }).catch((err) =>
+        console.warn(`Failed to delete SurgeConfig for ${validatedId}:`, err)
+      ),
+      MonitorMetric.deleteMany({ monitorId: validatedId }).catch((err) =>
+        console.warn(`Failed to delete MonitorMetrics for ${validatedId}:`, err)
+      ),
+    ]);
     await redis
       .del(
         `monitor:stats:${validatedId}`,

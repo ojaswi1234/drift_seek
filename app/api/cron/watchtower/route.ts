@@ -3,54 +3,15 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db_connect';
 import WebServer from '@/lib/models/WebServer';
 import SurgeConfig from '@/lib/models/SurgeConfig';
+import MonitorMetric from '@/lib/models/MonitorMetric';
 import redis from '@/lib/redis';
 import { sendTelegramAlert } from '@/lib/mailer';
-import { safeFetchWithRedirects } from '@/lib/security/urlValidator';
 import { safeTimingEqual } from '@/lib/auth/session';
+import { isActionAllowedToday } from '@/lib/monitoring/schedule';
+import { probeTargetUnified } from '@/lib/monitoring/probe';
+import { generateReadinessAndForecast } from '@/lib/monitoring/forecaster';
 
-function getMonitoringMode(surgeConfig: any): {
-  mode: 'baseline' | 'pre-event' | 'surge';
-  intervalMs: number;
-} {
-  const baselineIntervalMs = (surgeConfig?.baselineInterval || 5) * 60 * 1000;
-  if (!surgeConfig || !Array.isArray(surgeConfig.events) || surgeConfig.events.length === 0) {
-    return { mode: 'baseline', intervalMs: baselineIntervalMs };
-  }
-
-  const now = new Date();
-  let selected: { mode: 'baseline' | 'pre-event' | 'surge'; intervalMs: number } = {
-    mode: 'baseline',
-    intervalMs: baselineIntervalMs,
-  };
-
-  for (const event of surgeConfig.events) {
-    if (!event?.enabled || !event?.date) continue;
-
-    const eventDate = new Date(event.date);
-    if (Number.isNaN(eventDate.getTime())) continue;
-
-    const preEventStart = new Date(
-      eventDate.getTime() - (surgeConfig.preEventWindowHours || 24) * 60 * 60 * 1000
-    );
-    const surgeEnd = new Date(
-      eventDate.getTime() + (surgeConfig.surgeWindowHours || 24) * 60 * 60 * 1000
-    );
-
-    if (now >= eventDate && now <= surgeEnd) {
-      const surgeMs = (surgeConfig.surgeInterval || 15) * 1000;
-      if (surgeMs < selected.intervalMs || selected.mode !== 'surge') {
-        selected = { mode: 'surge', intervalMs: surgeMs };
-      }
-    } else if (now >= preEventStart && now < eventDate && selected.mode !== 'surge') {
-      const preMs = (surgeConfig.preEventInterval || 1) * 60 * 1000;
-      if (selected.mode === 'baseline' || preMs < selected.intervalMs) {
-        selected = { mode: 'pre-event', intervalMs: preMs };
-      }
-    }
-  }
-
-  return selected;
-}
+export const dynamic = 'force-dynamic';
 
 async function shouldCheck(monitorId: string, intervalMs: number): Promise<boolean> {
   try {
@@ -70,47 +31,6 @@ async function updateLastCheck(monitorId: string): Promise<void> {
   } catch (err) {
     console.warn(`Failed to update lastcheck for ${monitorId}:`, err);
   }
-}
-
-async function checkTarget(url: string): Promise<{
-  latency: number;
-  status: 'up' | 'down';
-  reason: string;
-  headers: Record<string, string>;
-}> {
-  const start = performance.now();
-  let status: 'up' | 'down' = 'down';
-  let reason = '';
-  const headers: Record<string, string> = {};
-
-  try {
-    const { response } = await safeFetchWithRedirects(url, {
-      method: 'HEAD',
-      timeoutMs: 10000,
-      allowHttp: true,
-      fallbackToGetOn405: true,
-    });
-    await response.body?.cancel().catch(() => {});
-
-    response.headers.forEach((value, key) => {
-      headers[key.toLowerCase()] = value;
-    });
-
-    if (response.ok) {
-      status = 'up';
-    } else {
-      reason = `HTTP ${response.status}`;
-    }
-  } catch (error) {
-    reason =
-      error instanceof Error && error.name === 'AbortError'
-        ? 'Timeout'
-        : error instanceof Error
-          ? error.message
-          : 'Network Failure';
-  }
-
-  return { latency: Math.round(performance.now() - start), status, reason, headers };
 }
 
 export async function GET(req: Request) {
@@ -153,11 +73,17 @@ export async function GET(req: Request) {
     let checkedCount = 0;
     let skippedCount = 0;
     const results: any[] = [];
+    const now = new Date();
+    const dayKey = now.toISOString().slice(0, 10);
 
     const processServer = async (server: any) => {
       const monitorId = server._id.toString();
       const surgeConfig = configMap.get(monitorId);
-      const { mode, intervalMs } = getMonitoringMode(surgeConfig);
+      const { allowed: actionAllowed, reason: actionReason, modeResult } = isActionAllowedToday(
+        surgeConfig,
+        now
+      );
+      const { mode, intervalMs, activeEvent } = modeResult;
 
       const shouldRun = await shouldCheck(monitorId, intervalMs);
       if (!shouldRun) {
@@ -172,19 +98,46 @@ export async function GET(req: Request) {
         };
       }
 
-      const { latency, status, reason, headers } = await checkTarget(server.url);
+      const preferBlackbox = surgeConfig?.useBlackboxProbe ?? true;
+      const probe = await probeTargetUnified(server.url, { preferBlackbox });
       await updateLastCheck(monitorId);
 
       const nowIso = new Date().toISOString();
+
+      await MonitorMetric.create({
+        monitorId: server._id,
+        url: server.url,
+        ownerEmail: server.ownerEmail,
+        status: probe.status,
+        latencyMs: probe.latencyMs,
+        ttfbMs: probe.ttfbMs,
+        connectMs: probe.connectMs,
+        tlsMs: probe.tlsMs,
+        resolveMs: probe.resolveMs,
+        transferMs: probe.transferMs,
+        httpStatusCode: probe.httpStatusCode,
+        httpVersion: probe.httpVersion,
+        compressed: probe.compressed,
+        cacheStatus: probe.cacheStatus,
+        cdnProvider: probe.cdnProvider,
+        mode,
+        source: probe.source,
+        reason: probe.reason,
+        timestamp: now,
+      }).catch((err) => console.warn(`MonitorMetric insert failed for ${monitorId}:`, err));
+
       const statsKey = `monitor:stats:${monitorId}`;
       try {
         await redis.hset(statsKey, {
-          status,
-          latency: String(latency),
-          reason,
+          status: probe.status,
+          latency: String(probe.latencyMs),
+          ttfbMs: String(probe.ttfbMs),
+          cacheStatus: probe.cacheStatus,
+          source: probe.source,
+          reason: probe.reason,
           lastChecked: nowIso,
           mode,
-          headers: JSON.stringify(headers),
+          headers: JSON.stringify(probe.headers),
         });
         await redis.expire(statsKey, 3600);
       } catch (redisErr) {
@@ -194,9 +147,11 @@ export async function GET(req: Request) {
       const metricPayload = {
         id: monitorId,
         url: server.url,
-        status,
-        latency,
-        reason,
+        status: probe.status,
+        latency: probe.latencyMs,
+        ttfbMs: probe.ttfbMs,
+        cacheStatus: probe.cacheStatus,
+        reason: probe.reason,
         lastChecked: nowIso,
         mode,
       };
@@ -209,27 +164,81 @@ export async function GET(req: Request) {
 
       const telegramEnabled = surgeConfig?.telegramEnabled ?? true;
       const alertKey = `alert_sent:${monitorId}`;
-      if (status === 'down' && telegramEnabled) {
+
+      // 24/7 passive telemetry always runs; Telegram notifications respect actionAllowed (day gating)
+      if (probe.status === 'down' && telegramEnabled && actionAllowed) {
         try {
           const alreadyAlerted = await redis.get(alertKey);
           if (!alreadyAlerted) {
             await sendTelegramAlert({
               url: server.url,
-              reason: reason || 'Service Unreachable',
+              reason: probe.reason || 'Service Unreachable',
               ownerEmail: server.ownerEmail,
               status: 'down',
-              latencyMs: latency,
+              latencyMs: probe.latencyMs,
             });
             await redis.set(alertKey, 'true', 'EX', 7200);
           }
         } catch (alertErr) {
           console.error(`Alert delivery failed for ${server.url}:`, alertErr);
         }
-      } else if (status === 'up') {
+      } else if (probe.status === 'up') {
+        await redis.del(alertKey).catch(() => {});
+      }
+
+      // Automated Pre-Event Readiness Audit & Telegram Brief during active event windows or specified action days
+      let readinessDispatched = false;
+      const autoReadiness = surgeConfig?.autoReadinessAlert ?? true;
+      if (
+        telegramEnabled &&
+        actionAllowed &&
+        autoReadiness &&
+        (mode === 'pre-event' || mode === 'surge')
+      ) {
+        const readinessKey = `readiness_alert_sent:${monitorId}:${activeEvent?.id || dayKey}`;
         try {
-          await redis.del(alertKey);
-        } catch {
-          // ignore
+          const alreadySent = await redis.get(readinessKey);
+          if (!alreadySent) {
+            const checks = surgeConfig?.readinessChecks || {
+              cdn: true,
+              compression: true,
+              protocol: true,
+              cacheHeaders: true,
+              sslExpiry: true,
+            };
+            const report = await generateReadinessAndForecast(monitorId, server.url, checks);
+            await SurgeConfig.findOneAndUpdate(
+              { monitorId: server._id, ownerEmail: server.ownerEmail },
+              {
+                $set: {
+                  lastReadinessReport: {
+                    score: report.score,
+                    report,
+                    generatedAt: new Date(),
+                  },
+                },
+              }
+            );
+
+            const topRecs =
+              report.recommendations.length > 0
+                ? `Top Fixes: ${report.recommendations.slice(0, 2).join(' | ')}`
+                : 'All infrastructure readiness checks passed.';
+
+            await sendTelegramAlert({
+              url: server.url,
+              status: 'info',
+              ownerEmail: server.ownerEmail,
+              latencyMs: report.telemetry.recentTtfbMs ?? probe.latencyMs,
+              title: `<b>Pre-Event Readiness Brief (${activeEvent?.name || mode.toUpperCase()})</b>`,
+              reason: `Readiness Score: ${report.score}/100 | Predicted Peak Multiplier: ${report.predictedPeakMultiplier}x | Crash Risk: ${report.crashProbability}% (${report.forecastBasis}) | ${topRecs}`,
+            });
+
+            await redis.set(readinessKey, 'true', 'EX', 86400);
+            readinessDispatched = true;
+          }
+        } catch (readinessErr) {
+          console.warn(`Automated pre-event readiness brief failed for ${monitorId}:`, readinessErr);
         }
       }
 
@@ -238,10 +247,14 @@ export async function GET(req: Request) {
         id: monitorId,
         name: server.name,
         url: server.url,
-        status,
-        latency,
-        reason,
+        status: probe.status,
+        latency: probe.latencyMs,
+        ttfbMs: probe.ttfbMs,
+        source: probe.source,
         mode,
+        actionAllowed,
+        actionReason,
+        readinessDispatched,
         checked: true,
       };
     };

@@ -51,6 +51,30 @@ services:
     networks:
       - driftseeker-network
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: driftseeker-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./blackbox-alerts.yml:/etc/prometheus/blackbox-alerts.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    depends_on:
+      - blackbox-exporter
+      - metrics-collector
+    networks:
+      - driftseeker-network
+
+volumes:
+  prometheus-data:
+
 networks:
   driftseeker-network:
     external: true

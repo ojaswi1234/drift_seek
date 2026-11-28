@@ -97,6 +97,31 @@ groups:
           summary: "Probe timeout risk for {{ $labels.target }}"
           description: "Probe duration ({{ $value | humanizeDuration }}) approaching 10s timeout."
 
+      - alert: BlackboxTTFBDegradation
+        expr: |
+          (
+            avg_over_time(probe_http_duration_seconds{phase="processing"}[5m])
+            /
+            clamp_min(avg_over_time(probe_http_duration_seconds{phase="processing"}[1h]), 0.01)
+          ) > 2.5
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "TTFB spike detected for {{ $labels.instance }}"
+          description: "Origin TTFB is over 2.5x the 1-hour baseline, indicating possible traffic saturation."
+
+      - alert: BlackboxLatencyJitterHigh
+        expr: stddev_over_time(probe_duration_seconds[5m]) > 0.4
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High latency jitter on {{ $labels.instance }}"
+          description: "5-minute latency standard deviation exceeds 400ms (congestion signal)."
+
   - name: driftseeker-blackbox-recording
     interval: 60s
     rules:

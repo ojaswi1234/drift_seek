@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Plus, X, Users, User, Image as ImageIcon } from "lucide-react";
+import { Plus, X, Users, User, Image as ImageIcon, AlertTriangle } from "lucide-react";
 import GlobalLoader from "@/components/GlobalLoader";
 import TeamRoomModal from "@/components/modals/user/TeamRoomModal";
 import WallpaperModal from "@/components/modals/user/WallpaperModal";
@@ -257,12 +257,24 @@ function TerminalInstance({
               DIR: {currentDir}
             </span>
           </div>
-          {mode === "team" && roomId && (
-            <div className="flex items-center gap-2">
-              <Users size={12} className="text-emerald-500/70" />
-              <span className="text-xs font-mono text-emerald-500/70">ROOM: {roomId}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {mode === "team" && roomId && (
+              <div className="flex items-center gap-2">
+                <Users size={12} className="text-emerald-500/70" />
+                <span className="text-xs font-mono text-emerald-500/70">ROOM: {roomId}</span>
+              </div>
+            )}
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase tracking-wider border ${
+                themeMode === "dark"
+                  ? "bg-amber-500/15 text-amber-300 border-amber-500/40"
+                  : "bg-amber-100 text-amber-800 border-amber-300"
+              }`}
+            >
+              <AlertTriangle size={11} className={themeMode === "dark" ? "text-amber-300" : "text-amber-600"} />
+              Maintenance Undergoing
+            </span>
+          </div>
         </div>
 
         <div
@@ -292,6 +304,35 @@ function TerminalInstance({
               </p>
             </div>
             <div className="h-px w-24 bg-linear-to-r from-emerald-500/50 to-transparent my-4" />
+            <div
+              className={`max-w-3xl rounded-lg border p-3.5 text-xs leading-relaxed ${
+                themeMode === "dark"
+                  ? "border-amber-500/30 bg-amber-950/25 text-amber-100/90"
+                  : "border-amber-200 bg-amber-50 text-amber-950"
+              }`}
+            >
+              <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                <span className="font-bold uppercase tracking-wider">
+                  About Integrated Web Shell
+                </span>
+                <span
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
+                    themeMode === "dark"
+                      ? "bg-amber-500/20 text-amber-300"
+                      : "bg-amber-200 text-amber-900"
+                  }`}
+                >
+                  Maintenance Undergoing
+                </span>
+              </div>
+              <p className={themeMode === "dark" ? "text-zinc-300" : "text-amber-900/90"}>
+                The Integrated Web Shell provides an in-browser, sandboxed bash environment with multi-tab instances,
+                Solo &amp; Team WebSocket room collaboration, directory state tracking, and custom workspace
+                themes—letting engineers inspect containers and debug issues without an external SSH client. Remote
+                terminal sandbox hosting is currently undergoing maintenance, so live shell connections may show
+                OFFLINE until the terminal server endpoint is connected.
+              </p>
+            </div>
           </div>
 
           <div className="space-y-1.5 mb-4 relative z-10">

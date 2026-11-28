@@ -17,6 +17,8 @@ type MonitorSocketPayload = {
   url: string;
   status: "up" | "down" | "online" | "offline" | "pending" | "error";
   latency: number;
+  ttfbMs?: number;
+  cacheStatus?: string;
   reason: string;
   lastChecked: string;
 };
@@ -39,6 +41,10 @@ interface SurgeConfig {
   preEventWindowHours: number;
   surgeWindowHours: number;
   telegramEnabled: boolean;
+  actionOnlyOnScheduledDays: boolean;
+  activeDaysOfWeek: number[];
+  autoReadinessAlert: boolean;
+  useBlackboxProbe: boolean;
   readinessChecks: {
     cdn: boolean;
     compression: boolean;
@@ -59,6 +65,26 @@ interface ReadinessReport {
   recommendations: string[];
   predictedPeakMultiplier?: number;
   crashProbability?: number;
+  forecastBasis?: "historical-telemetry" | "heuristic";
+  telemetry?: {
+    sampleCount: number;
+    baselineTtfbMs: number | null;
+    recentTtfbMs: number | null;
+    jitterMs: number | null;
+    p95LatencyMs: number | null;
+    errorRatePercent: number;
+    ttfbGrowthRatio: number | null;
+    lastCacheStatus: string;
+    telemetrySource: "prometheus" | "blackbox" | "mongodb-history" | "heuristic";
+    recentSamples: Array<{
+      timestamp: string;
+      latencyMs: number;
+      ttfbMs: number;
+      status: "up" | "down";
+      mode: string;
+      cacheStatus: string;
+    }>;
+  };
 }
 
 function flattenABLogs(logs: any[]): ABResultData[] {
@@ -186,6 +212,8 @@ export default function Page() {
                 ...server,
                 status: data.status,
                 latency: data.latency,
+                ttfbMs: data.ttfbMs ?? server.ttfbMs,
+                cacheStatus: data.cacheStatus ?? server.cacheStatus,
                 reason: data.reason,
                 lastChecked: data.lastChecked,
               }
@@ -260,6 +288,22 @@ export default function Page() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || "Failed to save config");
+    setWebsite((prev) =>
+      prev.map((server) =>
+        server._id === monitorId
+          ? {
+              ...server,
+              actionOnlyOnScheduledDays: Boolean(config.actionOnlyOnScheduledDays),
+              activeDaysOfWeek: Array.isArray(config.activeDaysOfWeek)
+                ? config.activeDaysOfWeek
+                : server.activeDaysOfWeek,
+              scheduledEventCount: Array.isArray(config.events)
+                ? config.events.filter((e) => e.enabled).length
+                : server.scheduledEventCount,
+            }
+          : server
+      )
+    );
   };
 
   const handleGenerateReadinessReport = async (
@@ -289,6 +333,8 @@ export default function Page() {
                 ...server,
                 status: data.monitor.status,
                 latency: data.monitor.latency,
+                ttfbMs: data.monitor.ttfbMs ?? server.ttfbMs,
+                cacheStatus: data.monitor.cacheStatus ?? server.cacheStatus,
                 reason: data.monitor.reason,
                 lastChecked: data.monitor.lastChecked,
               }
@@ -524,6 +570,10 @@ export default function Page() {
                       status={server.status}
                       reason={server.reason}
                       latency={server.latency}
+                      ttfbMs={server.ttfbMs}
+                      cacheStatus={server.cacheStatus}
+                      actionOnlyOnScheduledDays={server.actionOnlyOnScheduledDays}
+                      scheduledEventCount={server.scheduledEventCount}
                       lastChecked={server.lastChecked}
                       onCheck={handleTriggerCheck}
                       onDelete={(deletedId) =>

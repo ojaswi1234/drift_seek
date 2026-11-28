@@ -7,6 +7,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { z } from 'zod';
 import { objectIdSchema } from '@/lib/validation/schemas';
 import { parseJsonBody } from '@/lib/auth/session';
+import { computeHistoricalTelemetry } from '@/lib/monitoring/forecaster';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +34,10 @@ const surgeConfigSchema = z.object({
   preEventWindowHours: z.number().int().min(1).max(72).optional(),
   surgeWindowHours: z.number().int().min(1).max(72).optional(),
   telegramEnabled: z.boolean().optional(),
+  actionOnlyOnScheduledDays: z.boolean().optional(),
+  activeDaysOfWeek: z.array(z.number().int().min(0).max(6)).max(7).optional(),
+  autoReadinessAlert: z.boolean().optional(),
+  useBlackboxProbe: z.boolean().optional(),
   readinessChecks: z
     .object({
       cdn: z.boolean(),
@@ -80,6 +85,10 @@ export async function GET(
           preEventWindowHours: 24,
           surgeWindowHours: 24,
           telegramEnabled: true,
+          actionOnlyOnScheduledDays: false,
+          activeDaysOfWeek: [],
+          autoReadinessAlert: true,
+          useBlackboxProbe: true,
           readinessChecks: {
             cdn: true,
             compression: true,
@@ -92,7 +101,16 @@ export async function GET(
       { upsert: true, new: true }
     );
 
-    return NextResponse.json({ config });
+    const telemetry = await computeHistoricalTelemetry(idCheck.data, server.url).catch(() => null);
+
+    return NextResponse.json({
+      config,
+      telemetry,
+      integrations: {
+        blackboxConfigured: Boolean((process.env.BLACKBOX_URL || '').trim()),
+        prometheusConfigured: Boolean((process.env.PROMETHEUS_URL || '').trim()),
+      },
+    });
   } catch (err) {
     console.error('GET surge config error:', err);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });

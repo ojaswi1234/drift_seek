@@ -1,0 +1,58 @@
+# Prometheus Configuration for DriftSeeker Event-Driven Burst Monitoring
+# Uses http_sd_configs from the Next.js app to switch targets dynamically between
+# baseline (5m) and surge (15s) scrape intervals based on SurgeConfig schedules.
+
+global:
+  scrape_interval: 1m
+  evaluation_interval: 30s
+
+rule_files:
+  - '/etc/prometheus/blackbox-alerts.yml'
+
+scrape_configs:
+  # Job 1: Normal Days (Low overhead - every 5 minutes)
+  - job_name: 'driftseek-baseline'
+    scrape_interval: 5m
+    scrape_timeout: 15s
+    metrics_path: /probe
+    params:
+      module: [http_surge_probe]
+    http_sd_configs:
+      - url: 'http://app:3000/api/prometheus/targets?tier=baseline'
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - source_labels: [__param_target]
+        target_label: target
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # Job 2: Pre-Event Warmup & Event Surge Window (High resolution - every 15s)
+  - job_name: 'driftseek-surge'
+    scrape_interval: 15s
+    scrape_timeout: 12s
+    metrics_path: /probe
+    params:
+      module: [http_surge_probe]
+    http_sd_configs:
+      - url: 'http://app:3000/api/prometheus/targets?tier=surge'
+        refresh_interval: 15s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - source_labels: [__param_target]
+        target_label: target
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # Job 3: Scrape DriftSeeker Metrics Collector
+  - job_name: 'blackbox-metrics-collector'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['metrics-collector:9116']
+    metrics_path: /metrics

@@ -8,6 +8,10 @@ interface MonitorCardProps {
   status: 'online' | 'offline' | 'pending' | 'error' | 'up' | 'down';
   reason?: string;
   latency?: number;
+  ttfbMs?: number;
+  cacheStatus?: string;
+  actionOnlyOnScheduledDays?: boolean;
+  scheduledEventCount?: number;
   lastChecked?: string;
   onDelete?: (id: string) => void;
   onCheck?: (id: string) => void | Promise<void>;
@@ -40,6 +44,10 @@ const MonitorCard: React.FC<MonitorCardProps> = ({
   status,
   reason,
   latency,
+  ttfbMs,
+  cacheStatus,
+  actionOnlyOnScheduledDays,
+  scheduledEventCount,
   lastChecked,
   onDelete,
   onCheck,
@@ -171,6 +179,15 @@ const MonitorCard: React.FC<MonitorCardProps> = ({
           >
             {typeof latency === 'number' && Number.isFinite(latency) ? `${latency}ms` : '--'}
           </span>
+          {(typeof ttfbMs === 'number' && ttfbMs > 0) || (cacheStatus && cacheStatus !== 'NONE') ? (
+            <span className="text-[10px] text-gray-500 font-mono mt-0.5 truncate">
+              {typeof ttfbMs === 'number' && ttfbMs > 0 ? `TTFB ${ttfbMs}ms` : ''}
+              {typeof ttfbMs === 'number' && ttfbMs > 0 && cacheStatus && cacheStatus !== 'NONE'
+                ? ' • '
+                : ''}
+              {cacheStatus && cacheStatus !== 'NONE' ? `Cache ${cacheStatus}` : ''}
+            </span>
+          ) : null}
         </div>
         <div className="bg-white p-3 flex flex-col justify-center">
           <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-1">
@@ -180,6 +197,13 @@ const MonitorCard: React.FC<MonitorCardProps> = ({
             <Clock size={12} className="shrink-0" />
             <span className="truncate">{formatLastChecked(lastChecked)}</span>
           </div>
+          {(actionOnlyOnScheduledDays || (scheduledEventCount && scheduledEventCount > 0)) && (
+            <span className="text-[10px] text-gray-500 font-mono mt-0.5 truncate">
+              {actionOnlyOnScheduledDays ? '24/7 Silent • Day-Gated' : ''}
+              {actionOnlyOnScheduledDays && scheduledEventCount ? ' • ' : ''}
+              {scheduledEventCount ? `${scheduledEventCount} Event${scheduledEventCount > 1 ? 's' : ''}` : ''}
+            </span>
+          )}
         </div>
       </div>
 

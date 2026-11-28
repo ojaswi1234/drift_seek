@@ -57,6 +57,12 @@ const probeDurationGauge = new promClient.Gauge({
   labelNames: ['target', 'module'],
   registers: [register],
 });
+const probeTtfbGauge = new promClient.Gauge({
+  name: 'blackbox_probe_ttfb_seconds',
+  help: 'HTTP processing duration (Time To First Byte) in seconds',
+  labelNames: ['target', 'module'],
+  registers: [register],
+});
 const probeHttpStatusGauge = new promClient.Gauge({
   name: 'blackbox_probe_http_status_code',
   help: 'Response HTTP status code for HTTP probes',
@@ -183,6 +189,13 @@ async function probeTarget(target) {
 
 function parsePrometheusMetrics(text, target) {
   const metrics = {};
+  const phases = {
+    resolve: 0,
+    connect: 0,
+    tls: 0,
+    processing: 0,
+    transfer: 0,
+  };
   const lines = text.split('\n');
 
   for (const line of lines) {
@@ -191,9 +204,18 @@ function parsePrometheusMetrics(text, target) {
       /^([a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{([^}]*)\})?\s+([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?|NaN|[+-]Inf)(?:\s+\d+)?$/
     );
     if (match) {
-      const [, name, , rawValue] = match;
+      const [, name, labels = '', rawValue] = match;
       const numericValue = Number(rawValue);
-      if (Number.isFinite(numericValue) && !(name in metrics)) {
+      if (!Number.isFinite(numericValue)) continue;
+
+      if (name === 'probe_http_duration_seconds') {
+        const phaseMatch = labels.match(/phase="([^"]+)"/);
+        const phase = phaseMatch?.[1];
+        if (phase && phase in phases) {
+          phases[phase] = numericValue;
+        }
+        metrics[`probe_http_duration_seconds_${phase || 'other'}`] = numericValue;
+      } else if (!(name in metrics)) {
         metrics[name] = numericValue;
       }
     }
@@ -214,18 +236,54 @@ function parsePrometheusMetrics(text, target) {
     timestamp: new Date(),
     success,
     duration_seconds: duration,
+    ttfb_seconds: phases.processing,
+    phases,
     http_status_code: httpStatus,
     metrics,
     error: success ? null : 'Probe failed',
   };
 }
 
+async function resolveDynamicTargets() {
+  const targets = [...CONFIG.TARGETS];
+  const seenUrls = new Set(targets.map((t) => t.url));
+
+  if (db && healthStatus.mongo) {
+    try {
+      const webservers = await db
+        .collection('webservers')
+        .find({}, { projection: { _id: 1, name: 1, url: 1 } })
+        .limit(200)
+        .toArray();
+
+      for (const ws of webservers) {
+        if (!ws?.url || seenUrls.has(ws.url)) continue;
+        seenUrls.add(ws.url);
+        targets.push({
+          name: ws.name || `monitor_${ws._id}`,
+          url: ws.url,
+          module: 'http_surge_probe',
+        });
+      }
+    } catch (err) {
+      console.warn('⚠️ Could not load dynamic webservers from MongoDB:', err.message);
+    }
+  }
+
+  return targets;
+}
+
 async function collectMetrics() {
   if (isShuttingDown) return [];
 
-  console.log(`🔍 Starting metrics collection for ${CONFIG.TARGETS.length} targets...`);
+  if (!collection || !healthStatus.mongo) {
+    await connectMongo(1);
+  }
 
-  const results = await Promise.all(CONFIG.TARGETS.map((target) => probeTarget(target)));
+  const allTargets = await resolveDynamicTargets();
+  console.log(`🔍 Starting metrics collection for ${allTargets.length} targets...`);
+
+  const results = await Promise.all(allTargets.map((target) => probeTarget(target)));
 
   for (const r of results) {
     probeSuccessGauge.set({ target: r.target, module: r.module }, r.success ? 1 : 0);
@@ -233,13 +291,13 @@ async function collectMetrics() {
       { target: r.target, module: r.module },
       Number.isFinite(r.duration_seconds) ? r.duration_seconds : 0
     );
+    probeTtfbGauge.set(
+      { target: r.target, module: r.module },
+      Number.isFinite(r.ttfb_seconds) ? r.ttfb_seconds : 0
+    );
     if (r.http_status_code > 0) {
       probeHttpStatusGauge.set({ target: r.target, module: r.module }, r.http_status_code);
     }
-  }
-
-  if (!collection || !healthStatus.mongo) {
-    await connectMongo(1);
   }
 
   if (collection && healthStatus.mongo) {
