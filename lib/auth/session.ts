@@ -1,17 +1,27 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
+import { getAuthSecret } from '@/lib/auth/secret';
 
 export async function getGitHubAccessToken(req: NextRequest | Request): Promise<string | null> {
-  try {
-    const token = await getToken({
-      req: req as NextRequest,
-      secret: process.env.NEXTAUTH_SECRET,
-    });
-    return typeof token?.accessToken === 'string' && token.accessToken ? token.accessToken : null;
-  } catch {
-    return null;
+  const secret = getAuthSecret();
+
+  for (const secureCookie of [false, true]) {
+    try {
+      const token = await getToken({
+        req: req as NextRequest,
+        secret,
+        secureCookie,
+      });
+      if (typeof token?.accessToken === 'string' && token.accessToken) {
+        return token.accessToken;
+      }
+    } catch {
+      // Try next cookie variant
+    }
   }
+
+  return null;
 }
 
 export function safeTimingEqual(a: string, b: string): boolean {

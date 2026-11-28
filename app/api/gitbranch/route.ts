@@ -9,8 +9,15 @@ export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   const accessToken = await getGitHubAccessToken(request);
 
-  if (!session || !accessToken) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized: please sign in.' }, { status: 401 });
+  }
+
+  if (!accessToken) {
+    return NextResponse.json(
+      { error: 'GitHub access token missing. Please sign out and sign in again with GitHub.' },
+      { status: 401 }
+    );
   }
 
   const { searchParams } = new URL(request.url);
@@ -44,7 +51,10 @@ export async function GET(request: NextRequest) {
       );
 
       if (!res.ok) {
-        return NextResponse.json({ error: 'Failed to fetch branches' }, { status: res.status });
+        return NextResponse.json(
+          { error: `GitHub returned ${res.status} while fetching branches` },
+          { status: res.status }
+        );
       }
 
       const data = await res.json();

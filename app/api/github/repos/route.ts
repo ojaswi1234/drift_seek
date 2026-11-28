@@ -7,8 +7,15 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const accessToken = await getGitHubAccessToken(req);
 
-  if (!session || !accessToken) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized: please sign in.' }, { status: 401 });
+  }
+
+  if (!accessToken) {
+    return NextResponse.json(
+      { error: 'GitHub access token missing. Please sign out and sign in again with GitHub.' },
+      { status: 401 }
+    );
   }
 
   try {

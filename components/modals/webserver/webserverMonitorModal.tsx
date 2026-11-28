@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { X, CheckCircle2 } from "lucide-react";
 import "./webserver.css";
 
 interface WebserverMonitorModalProps {
@@ -16,13 +16,16 @@ const WebserverMonitorModal = ({
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const backdropPointerDownRef = useRef(false);
 
   useEffect(() => {
     if (!isOpen) {
       setName("");
       setUrl("");
       setError(null);
+      setSuccessMessage(null);
       setIsSubmitting(false);
       return;
     }
@@ -51,6 +54,7 @@ const WebserverMonitorModal = ({
 
     setIsSubmitting(true);
     setError(null);
+    setSuccessMessage(null);
     try {
       const res = await fetch("/api/database", {
         method: "POST",
@@ -73,7 +77,9 @@ const WebserverMonitorModal = ({
       }
 
       onSuccess?.();
-      onClose();
+      setSuccessMessage(`Monitor "${trimmedName}" added successfully!`);
+      setName("");
+      setUrl("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred while saving the monitor.");
     } finally {
@@ -82,13 +88,23 @@ const WebserverMonitorModal = ({
   };
 
   return (
-    <div className="modal backdrop-blur-md" onClick={onClose}>
+    <div
+      className="modal backdrop-blur-md"
+      onPointerDown={(e) => {
+        backdropPointerDownRef.current = e.target === e.currentTarget;
+      }}
+      onPointerUp={(e) => {
+        if (backdropPointerDownRef.current && e.target === e.currentTarget) {
+          onClose();
+        }
+        backdropPointerDownRef.current = false;
+      }}
+    >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-monitor-title"
         className="modal-content text-black"
-        onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
@@ -113,6 +129,13 @@ const WebserverMonitorModal = ({
             </div>
           )}
 
+          {successMessage && (
+            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded text-xs font-mono text-emerald-700 flex items-center gap-2">
+              <CheckCircle2 size={16} className="shrink-0" />
+              <span>{successMessage}</span>
+            </div>
+          )}
+
           <label htmlFor="monitor-name-input" className="block text-xs font-mono uppercase text-gray-600 mb-1">
             Monitor Name
           </label>
@@ -121,7 +144,10 @@ const WebserverMonitorModal = ({
             type="text"
             placeholder="Primary API"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (error) setError(null);
+            }}
             className="w-full p-2.5 border border-gray-300 rounded mb-4 text-black bg-white outline-none focus:border-black"
           />
 
@@ -133,17 +159,31 @@ const WebserverMonitorModal = ({
             type="text"
             placeholder="https://example.com"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              if (error) setError(null);
+            }}
             className="w-full p-2.5 border border-gray-300 rounded mb-5 text-black bg-white outline-none focus:border-black"
           />
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-black text-white py-2.5 rounded uppercase tracking-widest text-sm hover:bg-zinc-800 disabled:opacity-50 transition-colors cursor-pointer"
-          >
-            {isSubmitting ? "Saving..." : "Save Monitor"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex-1 bg-black text-white py-2.5 rounded uppercase tracking-widest text-sm hover:bg-zinc-800 disabled:opacity-50 transition-colors cursor-pointer"
+            >
+              {isSubmitting ? "Saving..." : successMessage ? "Add Another" : "Save Monitor"}
+            </button>
+            {successMessage && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 bg-gray-100 text-black rounded uppercase tracking-widest text-sm hover:bg-gray-200 transition-colors cursor-pointer"
+              >
+                Done
+              </button>
+            )}
+          </div>
         </form>
       </div>
     </div>

@@ -2,6 +2,7 @@
 import NextAuth, { AuthOptions, Profile, Session } from 'next-auth';
 import GithubProvider from 'next-auth/providers/github';
 import { JWT } from 'next-auth/jwt';
+import { getAuthSecret } from '@/lib/auth/secret';
 
 if (!process.env.GITHUB_ID || !process.env.GITHUB_SECRET) {
   console.warn(
@@ -14,6 +15,7 @@ if (process.env.NODE_ENV === 'production' && !process.env.NEXTAUTH_SECRET) {
 }
 
 export const authOptions: AuthOptions = {
+  secret: getAuthSecret(),
   providers: [
     GithubProvider({
       clientId: process.env.GITHUB_ID || '',

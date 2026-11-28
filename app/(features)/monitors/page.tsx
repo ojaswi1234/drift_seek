@@ -380,7 +380,6 @@ export default function Page() {
   };
 
   const handleRunABTest = async (githubUrl: string, branches: string[]) => {
-    setIsGithubModalOpen(false);
     setIsEngineRunning(true);
     setEngineError(null);
 
@@ -396,10 +395,12 @@ export default function Page() {
         throw new Error(data?.error || data?.message || "Failed to trigger A/B test");
       }
 
+      setIsGithubModalOpen(false);
       startPolling(githubUrl);
     } catch (err: any) {
       setEngineError(err?.message || "Failed to trigger A/B test");
       setIsEngineRunning(false);
+      throw err;
     }
   };
 
