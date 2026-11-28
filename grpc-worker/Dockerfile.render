@@ -19,5 +19,6 @@ COPY protos/ /app/protos/
 
 ENV NODE_ENV=production
 EXPOSE 50051
+EXPOSE 8080
 
 CMD ["npm", "start"]

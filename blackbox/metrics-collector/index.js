@@ -104,7 +104,19 @@ function validateConfig() {
       url: (process.env.TERMINAL_URL || (!isProd ? 'http://localhost:3001/health' : '')).trim(),
       module: 'http_2xx',
     },
-    { name: 'grpc-worker', url: normalizeHostPort(process.env.GRPC_URL || (!isProd ? 'localhost:50051' : '')), module: 'grpc' },
+    {
+      name: 'grpc-worker',
+      // If GRPC_URL is an HTTP/HTTPS URL (e.g. internal Render health endpoint), probe it directly.
+      // Otherwise treat as host:port for TCP probing.
+      url: (() => {
+        const raw = (process.env.GRPC_URL || (!isProd ? 'localhost:50051' : '')).trim();
+        return raw.startsWith('http://') || raw.startsWith('https://') ? raw : normalizeHostPort(raw);
+      })(),
+      module: (() => {
+        const raw = (process.env.GRPC_URL || '').trim();
+        return raw.startsWith('http://') || raw.startsWith('https://') ? 'http_2xx' : 'grpc';
+      })(),
+    },
     { name: 'mongodb', url: normalizeHostPort(process.env.MONGO_URL || (!isProd ? 'localhost:27017' : '')), module: 'mongodb' },
     { name: 'redis', url: normalizeHostPort(process.env.REDIS_URL || (!isProd ? 'localhost:6379' : '')), module: 'redis' },
   ].filter((t) => Boolean(t.url));

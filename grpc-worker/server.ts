@@ -1,6 +1,7 @@
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import dns from 'node:dns/promises';
+import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
 
@@ -312,6 +313,21 @@ function main() {
       process.exit(1);
     }
     console.log(`gRPC Monitoring Worker running on port ${boundPort}`);
+  });
+
+  // HTTP health endpoint so Render's internal network + metrics-collector can probe us
+  const httpPort = parseInt(process.env.HEALTH_PORT || '8080', 10);
+  const httpServer = http.createServer((req, res) => {
+    if (req.url === '/health' || req.url === '/') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'SERVING', grpcPort: port }));
+    } else {
+      res.writeHead(404);
+      res.end();
+    }
+  });
+  httpServer.listen(httpPort, '0.0.0.0', () => {
+    console.log(`HTTP health endpoint listening on port ${httpPort}`);
   });
 }
 
