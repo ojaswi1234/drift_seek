@@ -176,6 +176,7 @@ export async function GET(req: Request) {
               ownerEmail: server.ownerEmail,
               status: 'down',
               latencyMs: probe.latencyMs,
+              chatId: surgeConfig?.telegramChatId,
             });
             await redis.set(alertKey, 'true', 'EX', 7200);
           }
@@ -232,6 +233,7 @@ export async function GET(req: Request) {
               latencyMs: report.telemetry.recentTtfbMs ?? probe.latencyMs,
               title: `<b>Pre-Event Readiness Brief (${activeEvent?.name || mode.toUpperCase()})</b>`,
               reason: `Readiness Score: ${report.score}/100 | Predicted Peak Multiplier: ${report.predictedPeakMultiplier}x | Crash Risk: ${report.crashProbability}% (${report.forecastBasis}) | ${topRecs}`,
+              chatId: surgeConfig?.telegramChatId,
             });
 
             await redis.set(readinessKey, 'true', 'EX', 86400);

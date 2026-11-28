@@ -45,6 +45,7 @@ interface SurgeConfig {
   activeDaysOfWeek: number[];
   autoReadinessAlert: boolean;
   useBlackboxProbe: boolean;
+  telegramChatId?: string;
   readinessChecks: {
     cdn: boolean;
     compression: boolean;

@@ -423,7 +423,62 @@ export async function generateReadinessAndForecast(
     }
   }
 
+  // Live TTFB latency check — always runs; uses blackbox probe or historical recent value
+  const liveTtfb = telemetry.recentTtfbMs ?? (blackboxAudit?.ttfbMs ?? null);
+  if (liveTtfb !== null && liveTtfb > 0) {
+    totalChecks++;
+    if (liveTtfb <= 200) {
+      passedCount++;
+      results.checks.push({
+        name: 'Live Response Time',
+        passed: true,
+        message: `Current TTFB: ${liveTtfb}ms — excellent response speed`,
+        severity: 'info',
+      });
+    } else if (liveTtfb <= 500) {
+      passedCount++;
+      results.checks.push({
+        name: 'Live Response Time',
+        passed: true,
+        message: `Current TTFB: ${liveTtfb}ms — acceptable, but watch for degradation under surge`,
+        severity: 'info',
+      });
+    } else if (liveTtfb <= 1000) {
+      results.checks.push({
+        name: 'Live Response Time',
+        passed: false,
+        message: `Current TTFB: ${liveTtfb}ms — slow baseline; will worsen significantly under traffic`,
+        severity: 'warning',
+      });
+      results.recommendations.push(
+        `Baseline TTFB is ${liveTtfb}ms — optimize server response time (caching, DB query tuning) before the event`
+      );
+    } else {
+      results.checks.push({
+        name: 'Live Response Time',
+        passed: false,
+        message: `Current TTFB: ${liveTtfb}ms — critically slow; likely to 503 under any real traffic surge`,
+        severity: 'critical',
+      });
+      results.recommendations.push(
+        `Critical: ${liveTtfb}ms TTFB is too slow for a traffic event — prioritise server-side caching and horizontal scaling immediately`
+      );
+    }
+  }
+
   results.score = totalChecks > 0 ? Math.round((passedCount / totalChecks) * 100) : 100;
+
+  // Heuristic-mode confidence discount: without historical data we can't be fully certain,
+  // so cap the score at 85 to signal "infrastructure looks good but we lack real traffic evidence"
+  if (telemetry.sampleCount < 5) {
+    results.score = Math.min(results.score, 85);
+    results.checks.push({
+      name: 'Telemetry Confidence',
+      passed: false,
+      message: `Only ${telemetry.sampleCount} historical sample${telemetry.sampleCount === 1 ? '' : 's'} — score capped at 85 until more monitoring data is collected`,
+      severity: 'info',
+    });
+  }
 
   let infraPenalty = 0;
   if (checks.cdn && !results.checks.find((c) => c.name === 'CDN Detection')?.passed) infraPenalty += 0.5;
@@ -460,7 +515,9 @@ export async function generateReadinessAndForecast(
     results.forecastBasis = 'heuristic';
     const riskFactor = 1.0 + infraPenalty;
     results.predictedPeakMultiplier = Number(Math.min(riskFactor, 5.0).toFixed(2));
-    results.crashProbability = Math.min(Math.round((riskFactor - 1) * 25), 95);
+    // Minimum 15% crash probability in heuristic mode — without real traffic data we cannot
+    // guarantee zero risk, even for a well-configured site.
+    results.crashProbability = Math.min(Math.max(Math.round((riskFactor - 1) * 25), 15), 95);
   }
 
   return results;

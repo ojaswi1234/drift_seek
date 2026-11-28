@@ -38,6 +38,7 @@ const surgeConfigSchema = z.object({
   activeDaysOfWeek: z.array(z.number().int().min(0).max(6)).max(7).optional(),
   autoReadinessAlert: z.boolean().optional(),
   useBlackboxProbe: z.boolean().optional(),
+  telegramChatId: z.string().max(64).optional(),
   readinessChecks: z
     .object({
       cdn: z.boolean(),

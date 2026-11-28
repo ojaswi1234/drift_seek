@@ -48,6 +48,7 @@ const SurgeConfigSchema = new mongoose.Schema({
   },
   autoReadinessAlert: { type: Boolean, default: true },
   useBlackboxProbe: { type: Boolean, default: true },
+  telegramChatId: { type: String, default: '' }, // per-user Telegram chat ID; falls back to TELEGRAM_CHAT_ID env if empty
   readinessChecks: { type: ReadinessChecksSchema, default: () => ({}) },
   lastReadinessReport: {
     score: Number,

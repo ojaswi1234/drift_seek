@@ -42,6 +42,7 @@ interface SurgeConfig {
   activeDaysOfWeek: number[];
   autoReadinessAlert: boolean;
   useBlackboxProbe: boolean;
+  telegramChatId: string;
   readinessChecks: {
     cdn: boolean;
     compression: boolean;
@@ -145,6 +146,7 @@ function createDefaultConfig(monitor?: Monitor | null): SurgeConfig {
     activeDaysOfWeek: [],
     autoReadinessAlert: true,
     useBlackboxProbe: true,
+    telegramChatId: '',
     readinessChecks: {
       cdn: true,
       compression: true,
@@ -709,6 +711,27 @@ export default function SurgePredictionModal({
                       </p>
                     </div>
                   </label>
+
+                  {/* Per-monitor Telegram Chat ID */}
+                  <div className="pt-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Your Telegram Chat ID
+                    </label>
+                    <input
+                      type="text"
+                      value={config.telegramChatId}
+                      onChange={(e) =>
+                        setConfig((prev) => ({ ...prev, telegramChatId: e.target.value.trim() }))
+                      }
+                      placeholder="e.g. 123456789  (leave blank to use the global default)"
+                      className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-black/20 placeholder:text-gray-400"
+                      maxLength={64}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Alerts for <span className="font-mono">{config.monitorUrl || 'this monitor'}</span> will be sent only to this chat.
+                      Get your ID by messaging <span className="font-mono">@userinfobot</span> on Telegram.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="pt-2 border-t border-gray-200/80">

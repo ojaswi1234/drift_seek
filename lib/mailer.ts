@@ -5,6 +5,8 @@ interface AlertPayload {
   title?: string;
   status?: 'up' | 'down' | 'info';
   latencyMs?: number;
+  /** Per-monitor Telegram chat ID. Falls back to TELEGRAM_CHAT_ID env if omitted or empty. */
+  chatId?: string;
 }
 
 function escapeHtml(value: string): string {
@@ -21,12 +23,13 @@ export async function sendTelegramAlert({
   title,
   status = 'down',
   latencyMs,
+  chatId: perMonitorChatId,
 }: AlertPayload): Promise<{ success: boolean; skipped?: boolean }> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const chatId = (perMonitorChatId || '').trim() || (process.env.TELEGRAM_CHAT_ID || '').trim();
 
   if (!botToken || !chatId) {
-    console.warn('Missing Telegram credentials in environment.');
+    console.warn('Missing Telegram credentials — set TELEGRAM_CHAT_ID globally or per-monitor in Surge Config.');
     return { success: false, skipped: true };
   }
 
