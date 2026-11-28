@@ -1,25 +1,24 @@
 services:
-  # gRPC Worker Service
-  - type: worker
+  # gRPC Worker Service (Private Service for internal gRPC traffic)
+  - type: pserv
     name: driftseeker-grpc-worker
     env: docker
-    dockerfilePath: ./grpc-worker/Dockerfile
+    dockerfilePath: ./grpc-worker/Dockerfile.render
     dockerContext: .
-    plan: free
+    plan: starter
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: "50051"
-    healthCheckPath: /health
     autoDeploy: true
 
   # Terminal Server Service
   - type: web
     name: driftseeker-terminal-server
     env: docker
-    dockerfilePath: ./terminal-server/Dockerfile
-    dockerContext: ./terminal-server
+    dockerfilePath: ./terminal-server/Dockerfile.render
+    dockerContext: .
     plan: free
     envVars:
       - key: NODE_ENV
@@ -30,13 +29,10 @@ services:
         value: "50052"
       - key: NEXT_PUBLIC_API_BASE_URL
         value: https://drift-seek.vercel.app
-    healthCheckPath: /
+    healthCheckPath: /health
     autoDeploy: true
-    # Note: Docker socket access not available on Render free tier
-    # For production, consider using a separate Docker host or Render's native services
 
-  # Main Next.js App (Deployed on Vercel - this service may not be needed on Render)
-  # Keeping for reference if you want to deploy on Render too
+  # Main Next.js App
   - type: web
     name: driftseeker-app
     env: docker
@@ -49,7 +45,7 @@ services:
       - key: PORT
         value: "3000"
       - key: NEXTAUTH_URL
-        value: https://drift-seek.vercel.app/api/auth/callback/github
+        value: https://drift-seek.vercel.app
       - key: NEXT_PUBLIC_API_BASE_URL
         value: https://drift-seek.vercel.app
       - key: NEXT_PUBLIC_SERVER_BASE_URL
@@ -66,10 +62,10 @@ services:
         sync: false
       - key: GRPC_WORKER_URL
         value: driftseeker-grpc-worker:50051
-    healthCheckPath: /api/health
+    healthCheckPath: /api/restricted
     autoDeploy: true
 
-  # Blackbox Exporter - Stateless prober for monitoring
+  # Blackbox Exporter
   - type: web
     name: driftseeker-blackbox
     env: docker
@@ -82,7 +78,7 @@ services:
     healthCheckPath: /health
     autoDeploy: true
 
-  # Metrics Collector - Stores Blackbox probe results in MongoDB
+  # Metrics Collector
   - type: web
     name: driftseeker-metrics-collector
     env: docker
@@ -105,18 +101,14 @@ services:
       - key: APP_URL
         value: https://drift-seek.vercel.app
       - key: TERMINAL_URL
-        value: https://driftseek.duckdns.org
+        value: https://driftseek.duckdns.org/health
       - key: GRPC_URL
         value: driftseeker-grpc-worker:50051
     healthCheckPath: /health
     autoDeploy: true
 
-databases:
-  - name: driftseeker-mongo
-    databaseName: system_seek
-    plan: free
-    ipAllowList: []
-
-  - name: driftseeker-redis
+  # Managed Redis (Render Key Value)
+  - type: redis
+    name: driftseeker-redis
     plan: free
     ipAllowList: []

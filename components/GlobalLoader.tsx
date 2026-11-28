@@ -3,7 +3,7 @@ import styled from 'styled-components';
 
 const GlobalLoader = () => {
   return (
-    <StyledWrapper>
+    <StyledWrapper role="status" aria-label="Loading">
       <div className="stage">
         <div className="grid">
           <div className="strip">
@@ -42,7 +42,7 @@ const GlobalLoader = () => {
       </div>
     </StyledWrapper>
   );
-}
+};
 
 const StyledWrapper = styled.div`
   display: flex;
@@ -70,103 +70,46 @@ const StyledWrapper = styled.div`
     margin: 0 -6px;
     border-left: 12px solid transparent;
     border-right: 12px solid transparent;
-    border-bottom: 22px solid white;
-    filter: drop-shadow(0 0 18px white);
+    border-bottom: 22px solid currentColor;
+    filter: drop-shadow(0 0 12px currentColor);
     animation: pulse 1s infinite;
   }
   .tip.reverse {
     transform: rotate(180deg);
   }
-  .delay-01 {
-    animation-delay: -0.05s;
-  }
-  .delay-02 {
-    animation-delay: -0.1s;
-  }
-  .delay-03 {
-    animation-delay: -0.15s;
-  }
-  .delay-04 {
-    animation-delay: -0.2s;
-  }
-  .delay-05 {
-    animation-delay: -0.25s;
-  }
-  .delay-06 {
-    animation-delay: -0.3s;
-  }
-  .delay-07 {
-    animation-delay: -0.35s;
-  }
-  .delay-08 {
-    animation-delay: -0.4s;
-  }
-  .delay-09 {
-    animation-delay: -0.45s;
-  }
-  .delay-10 {
-    animation-delay: -0.5s;
-  }
-  .delay-11 {
-    animation-delay: -0.55s;
-  }
-  .delay-12 {
-    animation-delay: -0.6s;
-  }
-  .delay-13 {
-    animation-delay: -0.65s;
-  }
-  .delay-14 {
-    animation-delay: -0.7s;
-  }
-  .delay-15 {
-    animation-delay: -0.75s;
-  }
-  .delay-16 {
-    animation-delay: -0.8s;
-  }
-  .delay-17 {
-    animation-delay: -0.85s;
-  }
-  .delay-18 {
-    animation-delay: -0.9s;
-  }
-  .delay-19 {
-    animation-delay: -0.95s;
-  }
-  .delay-20 {
-    animation-delay: -1s;
-  }
+  .delay-01 { animation-delay: -0.05s; }
+  .delay-02 { animation-delay: -0.1s; }
+  .delay-03 { animation-delay: -0.15s; }
+  .delay-04 { animation-delay: -0.2s; }
+  .delay-05 { animation-delay: -0.25s; }
+  .delay-06 { animation-delay: -0.3s; }
+  .delay-07 { animation-delay: -0.35s; }
+  .delay-08 { animation-delay: -0.4s; }
+  .delay-09 { animation-delay: -0.45s; }
+  .delay-10 { animation-delay: -0.5s; }
+  .delay-11 { animation-delay: -0.55s; }
+  .delay-12 { animation-delay: -0.6s; }
+  .delay-13 { animation-delay: -0.65s; }
+  .delay-14 { animation-delay: -0.7s; }
+  .delay-15 { animation-delay: -0.75s; }
+  .delay-16 { animation-delay: -0.8s; }
+  .delay-17 { animation-delay: -0.85s; }
+  .delay-18 { animation-delay: -0.9s; }
+  .delay-19 { animation-delay: -0.95s; }
+  .delay-20 { animation-delay: -1s; }
 
-  .delay-a {
-    animation-delay: -0.17s;
-  }
-  .delay-b {
-    animation-delay: -0.33s;
-  }
-  .delay-c {
-    animation-delay: -0.5s;
-  }
-  .delay-d {
-    animation-delay: -0.67s;
-  }
-  .delay-e {
-    animation-delay: -0.83s;
-  }
-  .delay-f {
-    animation-delay: -1s;
-  }
+  .delay-a { animation-delay: -0.17s; }
+  .delay-b { animation-delay: -0.33s; }
+  .delay-c { animation-delay: -0.5s; }
+  .delay-d { animation-delay: -0.67s; }
+  .delay-e { animation-delay: -0.83s; }
+  .delay-f { animation-delay: -1s; }
 
   @keyframes pulse {
-    0% {
-      opacity: 0.1;
-    }
-    30% {
-      opacity: 1;
-    }
-    100% {
-      opacity: 0.1;
-    }
-  }`;
+    0% { opacity: 0.1; }
+    30% { opacity: 1; }
+    100% { opacity: 0.1; }
+  }
+`;
 
 export default GlobalLoader;

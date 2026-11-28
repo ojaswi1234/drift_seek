@@ -26,15 +26,17 @@ body {
   font-family: var(--font-sans);
 }
 
-.scrollbtn{
+.scrollbtn,
+.scrollbar-hide {
   scrollbar-width: none;
 }
 
-.scrollbtn::-webkit-scrollbar {
-  scrollbar-width: none;
+.scrollbtn::-webkit-scrollbar,
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
 .outlined-text {
-  -webkit-text-stroke: 2px black; /* outline thickness + color */
-  color: transparent;             /* remove fill */
+  -webkit-text-stroke: 2px black;
+  color: transparent;
 }

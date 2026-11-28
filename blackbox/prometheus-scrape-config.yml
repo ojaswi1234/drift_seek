@@ -1,45 +1,26 @@
 # Prometheus Scrape Configuration for Grafana Cloud
-# Add this to your Grafana Cloud Prometheus configuration
 
 scrape_configs:
-  # Scrape Blackbox Exporter metrics directly
+  # Scrape Blackbox Exporter metrics directly (HTTPS on Render)
   - job_name: 'blackbox-exporter'
+    scheme: https
     static_configs:
-      - targets: ['driftseeker-blackbox.onrender.com:9115']
+      - targets: ['driftseeker-blackbox.onrender.com']
     metrics_path: /metrics
 
-  # Scrape Metrics Collector (which aggregates and stores in MongoDB)
+  # Scrape Metrics Collector (aggregates probes and stores in MongoDB)
   - job_name: 'blackbox-metrics-collector'
+    scheme: https
     static_configs:
-      - targets: ['driftseeker-metrics-collector.onrender.com:9116']
+      - targets: ['driftseeker-metrics-collector.onrender.com']
     metrics_path: /metrics
 
-  # Optional: Scrape main app if it exposes Prometheus metrics
-  - job_name: 'driftseeker-app'
-    static_configs:
-      - targets: ['driftseeker-app.onrender.com:3000']
-    metrics_path: /api/metrics
+# Remote write configuration (supply credentials via Prometheus secret/env files)
+# remote_write:
+#   - url: https://prometheus-prod-XX-prod-us-central-0.grafana.net/api/prom/push
+#     basic_auth:
+#       username: "${GRAFANA_CLOUD_USER_ID}"
+#       password_file: /etc/prometheus/grafana_api_key
 
-  # Optional: Scrape terminal server
-  - job_name: 'driftseeker-terminal'
-    static_configs:
-      - targets: ['driftseeker-terminal-server.onrender.com:3001']
-    metrics_path: /metrics
-
-  # Optional: Scrape gRPC worker (if it exposes metrics)
-  - job_name: 'driftseeker-grpc-worker'
-    static_configs:
-      - targets: ['driftseeker-grpc-worker.onrender.com:50051']
-    metrics_path: /metrics
-
-# Remote write configuration (for sending to Grafana Cloud)
-# This goes in your prometheus.yml if running Prometheus locally
-remote_write:
-  - url: https://prometheus-prod-XX-prod-us-central-0.grafana.net/api/prom/push
-    basic_auth:
-      username: <your-grafana-cloud-user-id>
-      password: <your-grafana-cloud-api-key>
-
-# Alerting rules for Blackbox monitoring
 rule_files:
   - 'blackbox-alerts.yml'

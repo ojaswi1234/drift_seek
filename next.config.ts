@@ -21,6 +21,10 @@ const nextConfig: NextConfig = {
   },
   
   turbopack: {},
+
+  outputFileTracingIncludes: {
+    '/api/monitor/ping': ['./protos/**/*'],
+  },
   
   // Security headers
   async headers() {

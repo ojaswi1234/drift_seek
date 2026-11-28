@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Plus, X, Users, User, Image as ImageIcon } from "lucide-react";
 import GlobalLoader from "@/components/GlobalLoader";
 import TeamRoomModal from "@/components/modals/user/TeamRoomModal";
@@ -16,7 +16,23 @@ interface TabData {
   name: string;
 }
 
-// A single terminal instance that maintains its own socket and history
+interface HistoryLine {
+  id: string;
+  text: string;
+  isPrompt: boolean;
+}
+
+function getSafeWallpaperUrl(rawUrl: string | null): string | null {
+  if (!rawUrl) return null;
+  if (/^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/i.test(rawUrl)) {
+    return rawUrl;
+  }
+  if (/^https:\/\/[^\s"'()<>]+$/i.test(rawUrl)) {
+    return rawUrl;
+  }
+  return null;
+}
+
 function TerminalInstance({
   isActive,
   sysName,
@@ -37,55 +53,68 @@ function TerminalInstance({
   activeWallpaper: string | null;
 }) {
   const [input, setInput] = useState("");
-  const [history, setHistory] = useState<string[]>([]);
+  const [history, setHistory] = useState<HistoryLine[]>([]);
   const [isShellConnected, setIsShellConnected] = useState(false);
   const [currentDir, setCurrentDir] = useState<string>("/projects");
   const scrollRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
   const pendingCommandRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lineIdCounter = useRef(0);
 
-  // Initialize socket
+  const appendLines = useCallback((rawText: string, isPrompt = false) => {
+    const splitLines = rawText.split(/\r?\n/);
+    setHistory((prev) => [
+      ...prev,
+      ...splitLines
+        .filter((line) => line.length > 0)
+        .map((line) => ({
+          id: `${tabId}-${lineIdCounter.current++}`,
+          text: line,
+          isPrompt,
+        })),
+    ]);
+  }, [tabId]);
+
   useEffect(() => {
+    const serverUrl =
+      process.env.NEXT_PUBLIC_SERVER_BASE_URL ||
+      process.env.NEXT_PUBLIC_TERMINAL_URL ||
+      "https://driftseek.duckdns.org";
+
+    let socket: Socket;
     try {
-      socketRef.current = io(
-        process.env.GCP_BACKEND_URL || "https://driftseek.duckdns.org",
-        {
-          transports: ["polling", "websocket"],
-          auth: { username: sysName },
-          reconnection: true,
-          reconnectionAttempts: 10,
-          reconnectionDelay: 2000,
-        }
-      );
+      socket = io(serverUrl, {
+        transports: ["polling", "websocket"],
+        auth: { username: sysName, mode, roomId },
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 2000,
+      });
+      socketRef.current = socket;
     } catch (err) {
       console.error("Failed to initialize socket:", err);
-      setTimeout(() => {
-        setHistory((prev) => [...prev, "[client] Failed to initialize shell connection."]);
-      }, 0);
       return;
     }
 
-    socketRef.current.on("connect", () => setIsShellConnected(true));
-    socketRef.current.on("disconnect", () => setIsShellConnected(false));
-    socketRef.current.on("connect_error", (err) => {
+    socket.on("connect", () => setIsShellConnected(true));
+    socket.on("disconnect", () => setIsShellConnected(false));
+    socket.on("connect_error", () => {
       setIsShellConnected(false);
-      setHistory((prev) => [...prev, "[client] Unable to connect to terminal server."]);
+      appendLines("[client] Unable to connect to terminal server.", true);
     });
 
-    socketRef.current.on("output", (data: string) => {
+    socket.on("output", (data: string) => {
       let cleanData = data
-        .replace(/[\u001b\u009b]]\d+;[^\x07]+\x07/g, "")
+        .replace(/[\u001b\u009b]\][^\x07]*\x07/g, "")
         .replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, "");
 
       if (cleanData.includes("DRIFT_CLEAR_SCREEN")) {
-        setTimeout(() => {
-          setHistory([]);
-        }, 100);
+        setHistory([]);
         cleanData = cleanData.replace(/DRIFT_CLEAR_SCREEN\r?\n?/g, "");
       }
 
-      const promptRegex = /DRIFT_SERVER_PROMPT\|(.*?)\>\s/g;
+      const promptRegex = /DRIFT_SERVER_PROMPT\|(.*?)>\s?/g;
       let extractedDir: string | null = null;
       let match;
       while ((match = promptRegex.exec(cleanData)) !== null) {
@@ -108,94 +137,94 @@ function TerminalInstance({
         }
       }
 
-      if (cleanData) {
-        setHistory((prev) => [...prev, cleanData]);
+      if (cleanData.trim()) {
+        appendLines(cleanData, false);
       }
     });
 
     return () => {
-      socketRef.current?.off("connect");
-      socketRef.current?.off("disconnect");
-      socketRef.current?.off("connect_error");
-      socketRef.current?.off("output");
-      socketRef.current?.disconnect();
+      socket.off("connect");
+      socket.off("disconnect");
+      socket.off("connect_error");
+      socket.off("output");
+      socket.disconnect();
+      socketRef.current = null;
     };
-  }, [sysName]);
+  }, [sysName, mode, roomId, appendLines]);
 
-  // Auto-scroll
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [history]);
 
-  // Anime.js entrance animation when activated
   useEffect(() => {
-    if (isActive && containerRef.current) {
-      anime({
-        targets: containerRef.current,
-        opacity: [0, 1],
-        translateY: [5, 0],
-        duration: 300,
-        easing: "easeOutSine",
-      });
-      setTimeout(() => {
-        const inputEl = containerRef.current?.querySelector('input');
-        if (inputEl) inputEl.focus();
-      }, 50);
-    }
+    if (!isActive || !containerRef.current) return;
+    anime({
+      targets: containerRef.current,
+      opacity: [0, 1],
+      translateY: [5, 0],
+      duration: 300,
+      easing: "easeOutSine",
+    });
+    const focusTimer = window.setTimeout(() => {
+      const inputEl = containerRef.current?.querySelector("input");
+      if (inputEl) inputEl.focus();
+    }, 50);
+
+    return () => window.clearTimeout(focusTimer);
   }, [isActive]);
 
   const handleCommand = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    const trimmed = input.trim();
+    if (!trimmed) return;
 
-    if (input === "clear") {
+    if (trimmed === "clear") {
       setHistory([]);
       setInput("");
       return;
     }
 
     if (!socketRef.current?.connected) {
-      setHistory((prev) => [...prev, "[client] Shell is disconnected. Reconnect and try again."]);
+      appendLines("[client] Shell is disconnected. Reconnect and try again.", true);
       return;
     }
 
     try {
-      pendingCommandRef.current = input.trim();
+      pendingCommandRef.current = trimmed;
       socketRef.current.emit("input", input + "\r");
-    } catch (err) {
-      setHistory((prev) => [...prev, "[client] Failed to send command."]);
+    } catch {
+      appendLines("[client] Failed to send command.", true);
       return;
     }
 
     const prompt = `${sysName}:${currentDir}$ ${input}`;
-    setHistory((prev) => [...prev, prompt]);
+    appendLines(prompt, true);
     setInput("");
   };
+
+  const safeWallpaper = getSafeWallpaperUrl(activeWallpaper);
 
   return (
     <div
       ref={containerRef}
       className={`absolute inset-0 flex flex-col ${isActive ? "z-10" : "hidden"}`}
     >
-      {/* Background Wallpaper Image */}
-      {activeWallpaper && (
-        <div 
-          className={`absolute inset-0 z-0 blur-[0px] pointer-events-none ${
+      {safeWallpaper && (
+        <div
+          className={`absolute inset-0 z-0 pointer-events-none ${
             themeMode === "dark" ? "opacity-40" : "opacity-30 mix-blend-multiply"
           }`}
           style={{
-            backgroundImage: `url(${activeWallpaper})`,
+            backgroundImage: `url("${safeWallpaper}")`,
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
         />
       )}
 
-      {/* Content wrapper with z-index to overlay on background */}
       <div className="relative z-10 flex flex-col h-full">
-        {/* Console Header Stats (Minimalist) */}
         <div
           className={`flex items-center justify-between px-6 py-2 border-b ${
             themeMode === "dark"
@@ -203,78 +232,124 @@ function TerminalInstance({
               : "border-zinc-200 bg-white/70 backdrop-blur-md"
           }`}
         >
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div className={`w-1.5 h-1.5 rounded-full ${isShellConnected ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" : "bg-red-500"}`} />
-            <span className={`text-xs font-mono ${themeMode === "dark" ? "text-zinc-400" : "text-zinc-800"}`}>{isShellConnected ? "CONNECTED" : "OFFLINE"}</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isShellConnected
+                    ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"
+                    : "bg-red-500"
+                }`}
+              />
+              <span
+                className={`text-xs font-mono ${
+                  themeMode === "dark" ? "text-zinc-400" : "text-zinc-800"
+                }`}
+              >
+                {isShellConnected ? "CONNECTED" : "OFFLINE"}
+              </span>
+            </div>
+            <span
+              className={`text-xs font-mono ${
+                themeMode === "dark" ? "text-zinc-500" : "text-zinc-800 font-medium"
+              }`}
+            >
+              DIR: {currentDir}
+            </span>
           </div>
-          <span className={`text-xs font-mono ${themeMode === "dark" ? "text-zinc-600" : "text-zinc-800 font-medium"}`}>DIR: {currentDir}</span>
-        </div>
-        {mode === "team" && roomId && (
-          <div className="flex items-center gap-2">
-            <Users size={12} className="text-emerald-500/70" />
-            <span className="text-xs font-mono text-emerald-500/70">ROOM: {roomId}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Terminal View */}
-      <div
-        ref={scrollRef}
-        className={`flex-1 p-6 overflow-y-auto font-mono text-sm custom-scrollbar ${
-          themeMode === "dark" ? "text-zinc-300" : "text-zinc-900"
-        }`}
-      >
-        <div className="mb-8 opacity-90 text-xs">
-         <div
-            style={{ fontFamily: "var(--font-press-start), monospace" }}
-            className="text-2xl md:text-6xl bg-clip-text text-transparent 
-            bg-linear-to-r from-emerald-400 via-cyan-400 to-blue-500 mb-6 select-none"
-          >
-            Drift_Seeker
-          </div>
-          <div className={`space-y-1 font-mono ${themeMode === "dark" ? "text-zinc-400" : "text-zinc-800 font-medium"}`}>
-            <p>Welcome to DriftSeeker Terminal [Instance: {tabId}]</p>
-            <p>
-              Authorized User: {userName}{" "}
-              <span className={themeMode === "dark" ? "text-zinc-600" : "text-zinc-700 font-bold"}>({mode.toUpperCase()} MODE)</span>
-            </p>
-          </div>
-          <div className="h-px w-24 bg-linear-to-r from-emerald-500/50 to-transparent my-4" />
+          {mode === "team" && roomId && (
+            <div className="flex items-center gap-2">
+              <Users size={12} className="text-emerald-500/70" />
+              <span className="text-xs font-mono text-emerald-500/70">ROOM: {roomId}</span>
+            </div>
+          )}
         </div>
 
-        <div className="space-y-1.5 mb-4 relative z-10">
-          {history.map((line, i) => (
-            <p key={i} className={line.startsWith(`${sysName}:`) || line.includes("[client]") ? (themeMode === "dark" ? "text-zinc-500" : "text-zinc-600 font-medium") : (themeMode === "dark" ? "text-green-500 whitespace-pre-wrap" : "text-emerald-700 font-semibold whitespace-pre-wrap")}>
-              {line}
-            </p>
-          ))}
-        </div>
+        <div
+          ref={scrollRef}
+          className={`flex-1 p-6 overflow-y-auto font-mono text-sm custom-scrollbar ${
+            themeMode === "dark" ? "text-zinc-300" : "text-zinc-900"
+          }`}
+        >
+          <div className="mb-8 opacity-90 text-xs">
+            <div
+              style={{ fontFamily: "var(--font-press-start), monospace" }}
+              className="text-2xl md:text-6xl bg-clip-text text-transparent bg-linear-to-r from-emerald-400 via-cyan-400 to-blue-500 mb-6 select-none"
+            >
+              Drift_Seeker
+            </div>
+            <div
+              className={`space-y-1 font-mono ${
+                themeMode === "dark" ? "text-zinc-400" : "text-zinc-800 font-medium"
+              }`}
+            >
+              <p>Welcome to DriftSeeker Terminal [Instance: {tabId}]</p>
+              <p>
+                Authorized User: {userName}{" "}
+                <span className={themeMode === "dark" ? "text-zinc-500" : "text-zinc-700 font-bold"}>
+                  ({mode.toUpperCase()} MODE)
+                </span>
+              </p>
+            </div>
+            <div className="h-px w-24 bg-linear-to-r from-emerald-500/50 to-transparent my-4" />
+          </div>
 
-        {/* Active Input Line */}
-        <form onSubmit={handleCommand} className="flex items-center gap-2 mt-2 relative z-10">
-          <span className={themeMode === "dark" ? "text-green-500 shrink-0 select-none" : "text-emerald-700 shrink-0 select-none font-bold"}>❯</span>
-          <input
-            className={`bg-transparent border-none outline-none flex-1 placeholder-zinc-700 ${themeMode === "dark" ? "text-green-400 caret-green-500" : "text-zinc-950 font-medium caret-emerald-700"}`}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            spellCheck={false}
-            autoComplete="off"
-            placeholder={isShellConnected ? "Enter command..." : "Connecting..."}
-            disabled={!isShellConnected}
-          />
-        </form>
-      </div>
+          <div className="space-y-1.5 mb-4 relative z-10">
+            {history.map((line) => (
+              <p
+                key={line.id}
+                className={
+                  line.isPrompt || line.text.includes("[client]")
+                    ? themeMode === "dark"
+                      ? "text-zinc-500"
+                      : "text-zinc-600 font-medium"
+                    : themeMode === "dark"
+                      ? "text-green-500 whitespace-pre-wrap"
+                      : "text-emerald-700 font-semibold whitespace-pre-wrap"
+                }
+              >
+                {line.text}
+              </p>
+            ))}
+          </div>
+
+          <form onSubmit={handleCommand} className="flex items-center gap-2 mt-2 relative z-10">
+            <span
+              className={
+                themeMode === "dark"
+                  ? "text-green-500 shrink-0 select-none"
+                  : "text-emerald-700 shrink-0 select-none font-bold"
+              }
+            >
+              ❯
+            </span>
+            <input
+              aria-label="Terminal command input"
+              className={`bg-transparent border-none outline-none flex-1 placeholder-zinc-600 ${
+                themeMode === "dark"
+                  ? "text-green-400 caret-green-500"
+                  : "text-zinc-950 font-medium caret-emerald-700"
+              }`}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              spellCheck={false}
+              autoComplete="off"
+              placeholder={isShellConnected ? "Enter command..." : "Connecting..."}
+              disabled={!isShellConnected}
+            />
+          </form>
+        </div>
       </div>
     </div>
   );
 }
 
 export default function Page() {
+  const router = useRouter();
   const { data: session, status } = useSession({
     required: true,
     onUnauthenticated() {
-      redirect("/");
+      router.replace("/");
     },
   });
 
@@ -290,28 +365,44 @@ export default function Page() {
   const [showWallpaperModal, setShowWallpaperModal] = useState(false);
   const [activeWallpaper, setActiveWallpaper] = useState<string | null>(null);
 
-  const fetchActiveWallpaper = async () => {
+  const fetchActiveWallpaper = useCallback(async () => {
     try {
       const res = await fetch("/api/wallpaper");
       if (res.ok) {
         const data = await res.json();
-        const active = data.wallpapers?.find((w: any) => w.isActive);
-        if (active) setActiveWallpaper(active.image);
-        else setActiveWallpaper(null);
+        const active = data.wallpapers?.find((w: { isActive: boolean; image: string }) => w.isActive);
+        setActiveWallpaper(active ? active.image : null);
       }
     } catch (e) {
       console.error(e);
     }
-  };
-
-  useEffect(() => {
-    fetchActiveWallpaper();
   }, []);
 
-  // Layout Animation
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/wallpaper");
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          const active = data.wallpapers?.find(
+            (w: { isActive: boolean; image: string }) => w.isActive
+          );
+          setActiveWallpaper(active ? active.image : null);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
+
   const layoutRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (layoutRef.current && status !== "loading") {
+    if (layoutRef.current && status === "authenticated") {
       anime({
         targets: layoutRef.current,
         opacity: [0, 1],
@@ -322,7 +413,13 @@ export default function Page() {
     }
   }, [status]);
 
-  if (status === "loading") return <GlobalLoader />;
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen w-full bg-zinc-950 text-white flex items-center justify-center pl-12 sm:pl-16 lg:pl-18">
+        <GlobalLoader />
+      </div>
+    );
+  }
 
   const sysName = session?.user?.username?.toLowerCase().replace(/\s+/g, "_") || "root_user";
   const userName = session?.user?.name || "Admin";
@@ -330,17 +427,17 @@ export default function Page() {
   const addTab = () => {
     tabCounter.current += 1;
     const newTabId = `tab-${tabCounter.current}`;
-    setTabs([...tabs, { id: newTabId, name: `terminal-${tabCounter.current}` }]);
+    setTabs((prev) => [...prev, { id: newTabId, name: `terminal-${tabCounter.current}` }]);
     setActiveTabId(newTabId);
   };
 
   const closeTab = (e: React.MouseEvent, idToClose: string) => {
     e.stopPropagation();
-    if (tabs.length === 1) return; // Prevent closing the last tab
+    if (tabs.length === 1) return;
 
     const newTabs = tabs.filter((t) => t.id !== idToClose);
     setTabs(newTabs);
-    
+
     if (activeTabId === idToClose) {
       setActiveTabId(newTabs[newTabs.length - 1].id);
     }
@@ -356,9 +453,8 @@ export default function Page() {
   };
 
   return (
-    // THE FIX IS HERE: Added pl-16 sm:pl-20 md:pl-24 lg:pl-24 to safely clear the fixed navbar
     <div
-      className={`min-h-screen flex items-center justify-center pl-16 sm:pl-20 md:pl-24 lg:pl-24 pr-4 md:pr-8 py-4 md:py-8 font-sans selection:bg-emerald-500/30 overflow-hidden transition-colors duration-300 ${
+      className={`min-h-screen w-full flex items-center justify-center pl-16 sm:pl-20 md:pl-24 pr-4 md:pr-8 py-4 md:py-8 font-sans selection:bg-emerald-500/30 overflow-hidden transition-colors duration-300 ${
         themeMode === "dark" ? "bg-zinc-950 text-zinc-100" : "bg-zinc-100 text-zinc-900"
       }`}
     >
@@ -368,57 +464,72 @@ export default function Page() {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(16, 185, 129, 0.2); border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(16, 185, 129, 0.5); }
       `}</style>
-      
-      {/* THE SECOND FIX IS HERE: w-[98vw] changed to w-full max-w-full to respect parent padding. Height increased to 98vh */}
-      <div 
+
+      <div
         ref={layoutRef}
-        className={`bg-[#0c0c0c] border border-zinc-800/60 rounded-xl shadow-2xl flex flex-col overflow-hidden 
-          transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] origin-center
-          w-full max-w-full h-[98vh]
-        `}
+        className={`rounded-xl shadow-2xl flex flex-col overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] origin-center w-full max-w-full h-[calc(100vh-2rem)] md:h-[calc(100vh-4rem)] border ${
+          themeMode === "dark"
+            ? "bg-[#0c0c0c] border-zinc-800/60"
+            : "bg-white border-zinc-200"
+        }`}
       >
-        {/* Sleek MacOS-like Window Header + Tabs */}
-        <div className={`flex border-b ${themeMode === "dark" ? "bg-zinc-950 border-zinc-800/60" : "bg-white border-zinc-200"}`}>
-          
-          <TerminalDropdown 
-            currentMode={themeMode}
-            onModeChange={setThemeMode}
-          />
-          
-          <div className="flex flex-1 overflow-x-auto scrollbar-hide">
-            {tabs.map((tab) => (
-              <div
-                key={tab.id}
-                onClick={() => setActiveTabId(tab.id)}
-                className={`group flex items-center gap-3 px-4 py-2.5 text-xs font-mono cursor-pointer border-r transition-all duration-200 min-w-35 max-w-50 ${
-                  themeMode === "dark" ? "border-zinc-800/60" : "border-zinc-200"
-                } ${
-                  activeTabId === tab.id
-                    ? themeMode === "dark"
-                      ? "bg-[#0c0c0c] text-zinc-200"
-                      : "bg-zinc-50 text-zinc-900"
-                    : themeMode === "dark"
-                      ? "bg-zinc-900/50 text-zinc-500 hover:bg-zinc-900"
-                      : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
-                }`}
-              >
-                <span className="truncate flex-1">{tab.name}</span>
-                {tabs.length > 1 && (
+        <div
+          className={`flex border-b ${
+            themeMode === "dark" ? "bg-zinc-950 border-zinc-800/60" : "bg-white border-zinc-200"
+          }`}
+        >
+          <TerminalDropdown currentMode={themeMode} onModeChange={setThemeMode} />
+
+          <div role="tablist" aria-label="Terminal tabs" className="flex flex-1 overflow-x-auto scrollbar-hide">
+            {tabs.map((tab) => {
+              const isTabActive = activeTabId === tab.id;
+              return (
+                <div
+                  key={tab.id}
+                  className={`group flex items-center border-r transition-all duration-200 min-w-35 max-w-50 ${
+                    themeMode === "dark" ? "border-zinc-800/60" : "border-zinc-200"
+                  } ${
+                    isTabActive
+                      ? themeMode === "dark"
+                        ? "bg-[#0c0c0c] text-zinc-200"
+                        : "bg-zinc-50 text-zinc-900"
+                      : themeMode === "dark"
+                        ? "bg-zinc-900/50 text-zinc-500 hover:bg-zinc-900"
+                        : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+                  }`}
+                >
                   <button
-                    onClick={(e) => closeTab(e, tab.id)}
-                    className={`ml-auto p-0.5 rounded-md transition-opacity ${
-                      activeTabId === tab.id ? "opacity-100 hover:bg-zinc-800" : "opacity-0 group-hover:opacity-100 hover:text-zinc-300"
-                    }`}
+                    type="button"
+                    role="tab"
+                    aria-selected={isTabActive}
+                    onClick={() => setActiveTabId(tab.id)}
+                    className="flex-1 text-left px-4 py-2.5 text-xs font-mono truncate cursor-pointer focus:outline-none"
                   >
-                    <X size={12} />
+                    {tab.name}
                   </button>
-                )}
-              </div>
-            ))}
-            
+                  {tabs.length > 1 && (
+                    <button
+                      type="button"
+                      aria-label={`Close ${tab.name}`}
+                      onClick={(e) => closeTab(e, tab.id)}
+                      className={`mr-2 p-0.5 rounded-md transition-opacity cursor-pointer ${
+                        isTabActive
+                          ? "opacity-100 hover:bg-zinc-800"
+                          : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-zinc-300"
+                      }`}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+
             <button
+              type="button"
+              aria-label="New terminal tab"
               onClick={addTab}
-              className={`flex items-center justify-center px-4 py-2 transition-colors ${
+              className={`flex items-center justify-center px-4 py-2 transition-colors cursor-pointer ${
                 themeMode === "dark"
                   ? "hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300"
                   : "hover:bg-zinc-200 text-zinc-500 hover:text-zinc-800"
@@ -428,51 +539,64 @@ export default function Page() {
             </button>
           </div>
 
-          <div className={`flex items-center gap-1 px-3 border-l shrink-0 ${themeMode === "dark" ? "border-zinc-800/60" : "border-zinc-200"}`}>
-            <div className={`flex rounded-md p-0.5 ${themeMode === "dark" ? "bg-zinc-900" : "bg-zinc-200"}`}>
+          <div
+            className={`flex items-center gap-1 px-3 border-l shrink-0 ${
+              themeMode === "dark" ? "border-zinc-800/60" : "border-zinc-200"
+            }`}
+          >
+            <div
+              className={`flex rounded-md p-0.5 ${
+                themeMode === "dark" ? "bg-zinc-900" : "bg-zinc-200"
+              }`}
+            >
               <button
+                type="button"
                 onClick={() => handleModeSwitch("individual")}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono transition-all duration-200 ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono transition-all duration-200 cursor-pointer ${
                   mode === "individual"
                     ? themeMode === "dark"
                       ? "bg-zinc-800 text-zinc-200 shadow-sm"
                       : "bg-white text-zinc-900 shadow-sm"
                     : themeMode === "dark"
                       ? "text-zinc-500 hover:text-zinc-400"
-                      : "text-zinc-500 hover:text-zinc-700"
+                      : "text-zinc-600 hover:text-zinc-800"
                 }`}
               >
                 <User size={12} />
                 <span className="hidden sm:inline">Solo</span>
               </button>
               <button
+                type="button"
                 onClick={() => handleModeSwitch("team")}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono transition-all duration-200 ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono transition-all duration-200 cursor-pointer ${
                   mode === "team"
-                    ? "bg-emerald-500/20 text-emerald-400 shadow-sm"
+                    ? "bg-emerald-500/20 text-emerald-500 shadow-sm"
                     : themeMode === "dark"
                       ? "text-zinc-500 hover:text-zinc-400"
-                      : "text-zinc-500 hover:text-zinc-700"
+                      : "text-zinc-600 hover:text-zinc-800"
                 }`}
               >
                 <Users size={12} />
                 <span className="hidden sm:inline">Team</span>
               </button>
             </div>
-            
+
             <button
-               onClick={() => setShowWallpaperModal(true)}
-               title="Terminal Wallpaper"
-               className={`flex items-center gap-1.5 px-3 py-1 ml-2 rounded-sm text-xs font-mono transition-all duration-200 hover:opacity-80
-                 ${themeMode === "dark" ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-600 hover:text-zinc-900"}
-               `}
+              type="button"
+              onClick={() => setShowWallpaperModal(true)}
+              aria-label="Terminal Wallpaper"
+              title="Terminal Wallpaper"
+              className={`flex items-center gap-1.5 px-3 py-1 ml-2 rounded-sm text-xs font-mono transition-all duration-200 hover:opacity-80 cursor-pointer ${
+                themeMode === "dark"
+                  ? "text-zinc-400 hover:text-zinc-200"
+                  : "text-zinc-600 hover:text-zinc-900"
+              }`}
             >
-               <ImageIcon size={14} />
+              <ImageIcon size={14} />
             </button>
           </div>
         </div>
 
-        {/* Terminals Container */}
         <div className={`flex-1 relative ${themeMode === "dark" ? "bg-[#0c0c0c]" : "bg-zinc-50"}`}>
           {tabs.map((tab) => (
             <TerminalInstance
@@ -496,13 +620,18 @@ export default function Page() {
         onMemberIdChange={setMemberIdInput}
         memberRoleInput={memberRoleInput}
         onMemberRoleChange={setMemberRoleInput}
+        onRoomConnected={(roomId) => {
+          setActiveRoomId(roomId);
+          setMode("team");
+          setShowTeamModal(false);
+        }}
         onCancel={() => {
           setShowTeamModal(false);
           if (mode !== "team") setMode("individual");
         }}
       />
 
-      <WallpaperModal 
+      <WallpaperModal
         isOpen={showWallpaperModal}
         onCancel={() => setShowWallpaperModal(false)}
         onWallpaperUpdated={fetchActiveWallpaper}

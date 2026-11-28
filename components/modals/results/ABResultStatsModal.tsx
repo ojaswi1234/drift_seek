@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { X, GitBranch, CheckCircle2, AlertTriangle } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -10,6 +10,7 @@ import {
   PointElement,
   LineElement,
   RadialLinearScale,
+  Filler,
   Tooltip,
   Legend,
 } from "chart.js";
@@ -22,8 +23,9 @@ ChartJS.register(
   PointElement,
   LineElement,
   RadialLinearScale,
+  Filler,
   Tooltip,
-  Legend,
+  Legend
 );
 
 type MetricSet = {
@@ -59,11 +61,21 @@ const toFixedSafe = (value: number, decimals = 2) => {
 };
 
 const percentDelta = (base: number, next: number) => {
-  if (!Number.isFinite(base) || base === 0) return 0;
+  if (!Number.isFinite(base) || !Number.isFinite(next)) return 0;
+  if (base === 0) return next === 0 ? 0 : 100;
   return ((next - base) / base) * 100;
 };
 
 export default function ABResultStatsModal({ isOpen, onClose, data }: ABResultStatsModalProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose]);
+
   const normalized = useMemo(() => {
     if (!data) {
       return {
@@ -77,28 +89,33 @@ export default function ABResultStatsModal({ isOpen, onClose, data }: ABResultSt
       };
     }
 
+    const metrics = data.metrics || {};
     const baseline = {
-      requestsPerSecond: Number(data.metrics.baselineMetrics?.requestsPerSecond || 0),
-      latencyAverage: Number(data.metrics.baselineMetrics?.latencyAverage || 0),
-      latency99th: Number(data.metrics.baselineMetrics?.latency99th || 0),
-      successRate: Number(data.metrics.baselineMetrics?.successRate || 0),
+      requestsPerSecond: Number(metrics.baselineMetrics?.requestsPerSecond || 0),
+      latencyAverage: Number(metrics.baselineMetrics?.latencyAverage || 0),
+      latency99th: Number(metrics.baselineMetrics?.latency99th || 0),
+      successRate: Number(metrics.baselineMetrics?.successRate || 0),
     };
 
     const candidate = {
-      requestsPerSecond: Number(data.metrics.candidateMetrics?.requestsPerSecond || 0),
-      latencyAverage: Number(data.metrics.candidateMetrics?.latencyAverage || 0),
-      latency99th: Number(data.metrics.candidateMetrics?.latency99th || 0),
-      successRate: Number(data.metrics.candidateMetrics?.successRate || 0),
+      requestsPerSecond: Number(metrics.candidateMetrics?.requestsPerSecond || 0),
+      latencyAverage: Number(metrics.candidateMetrics?.latencyAverage || 0),
+      latency99th: Number(metrics.candidateMetrics?.latency99th || 0),
+      successRate: Number(metrics.candidateMetrics?.successRate || 0),
     };
 
+    const parsedDate = data.testedAt ? new Date(data.testedAt) : null;
+    const testedAtStr =
+      parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate.toLocaleString() : "N/A";
+
     return {
-      repoName: data.githubUrl.replace("https://github.com/", ""),
-      testedAt: new Date(data.testedAt).toLocaleString(),
-      baselineBranch: data.metrics.baselineBranch || "baseline",
-      candidateBranch: data.metrics.candidateBranch || "candidate",
+      repoName: (data.githubUrl || "").replace("https://github.com/", ""),
+      testedAt: testedAtStr,
+      baselineBranch: metrics.baselineBranch || "baseline",
+      candidateBranch: metrics.candidateBranch || "candidate",
       baseline,
       candidate,
-      passed: data.metrics.passed !== false,
+      passed: metrics.passed !== false,
     };
   }, [data]);
 
@@ -130,16 +147,24 @@ export default function ABResultStatsModal({ isOpen, onClose, data }: ABResultSt
     ],
   };
 
+  const maxRps = Math.max(normalized.baseline.requestsPerSecond, normalized.candidate.requestsPerSecond, 1);
+  const maxAvgLat = Math.max(normalized.baseline.latencyAverage, normalized.candidate.latencyAverage, 1);
+  const maxP99Lat = Math.max(normalized.baseline.latency99th, normalized.candidate.latency99th, 1);
+
   const radarData = {
-    labels: ["Throughput", "Stability", "Latency Efficiency", "Tail Latency"],
+    labels: ["Throughput (norm)", "Stability (%)", "Avg Speed (norm)", "Tail Speed (norm)"],
     datasets: [
       {
         label: normalized.baselineBranch,
         data: [
-          normalized.baseline.requestsPerSecond,
+          (normalized.baseline.requestsPerSecond / maxRps) * 100,
           normalized.baseline.successRate,
-          normalized.baseline.latencyAverage > 0 ? 1000 / normalized.baseline.latencyAverage : 0,
-          normalized.baseline.latency99th > 0 ? 1000 / normalized.baseline.latency99th : 0,
+          normalized.baseline.latencyAverage > 0
+            ? Math.max(0, 100 - (normalized.baseline.latencyAverage / maxAvgLat) * 50)
+            : 100,
+          normalized.baseline.latency99th > 0
+            ? Math.max(0, 100 - (normalized.baseline.latency99th / maxP99Lat) * 50)
+            : 100,
         ],
         borderColor: "rgba(2, 132, 199, 1)",
         backgroundColor: "rgba(2, 132, 199, 0.2)",
@@ -147,10 +172,14 @@ export default function ABResultStatsModal({ isOpen, onClose, data }: ABResultSt
       {
         label: normalized.candidateBranch,
         data: [
-          normalized.candidate.requestsPerSecond,
+          (normalized.candidate.requestsPerSecond / maxRps) * 100,
           normalized.candidate.successRate,
-          normalized.candidate.latencyAverage > 0 ? 1000 / normalized.candidate.latencyAverage : 0,
-          normalized.candidate.latency99th > 0 ? 1000 / normalized.candidate.latency99th : 0,
+          normalized.candidate.latencyAverage > 0
+            ? Math.max(0, 100 - (normalized.candidate.latencyAverage / maxAvgLat) * 50)
+            : 100,
+          normalized.candidate.latency99th > 0
+            ? Math.max(0, 100 - (normalized.candidate.latency99th / maxP99Lat) * 50)
+            : 100,
         ],
         borderColor: "rgba(22, 163, 74, 1)",
         backgroundColor: "rgba(22, 163, 74, 0.2)",
@@ -160,17 +189,37 @@ export default function ABResultStatsModal({ isOpen, onClose, data }: ABResultSt
 
   if (!isOpen || !data) return null;
 
-  const rpsDelta = percentDelta(normalized.baseline.requestsPerSecond, normalized.candidate.requestsPerSecond);
-  const avgLatencyDelta = percentDelta(normalized.baseline.latencyAverage, normalized.candidate.latencyAverage);
+  const rpsDelta = percentDelta(
+    normalized.baseline.requestsPerSecond,
+    normalized.candidate.requestsPerSecond
+  );
+  const avgLatencyDelta = percentDelta(
+    normalized.baseline.latencyAverage,
+    normalized.candidate.latencyAverage
+  );
   const p99Delta = percentDelta(normalized.baseline.latency99th, normalized.candidate.latency99th);
-  const successDelta = percentDelta(normalized.baseline.successRate, normalized.candidate.successRate);
+  const successDelta = percentDelta(
+    normalized.baseline.successRate,
+    normalized.candidate.successRate
+  );
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
-      <div className="w-full max-w-7xl max-h-[92vh] overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-2xl flex flex-col">
-        <div className="px-8 py-6 border-b border-gray-200 flex items-start justify-between gap-4 shrink-0">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={onClose} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ab-stats-modal-title"
+        className="relative w-full max-w-7xl max-h-[92vh] overflow-hidden bg-white text-gray-900 border border-gray-200 rounded-2xl shadow-2xl flex flex-col"
+      >
+        <div className="px-6 sm:px-8 py-6 border-b border-gray-200 flex items-start justify-between gap-4 shrink-0">
           <div className="min-w-0">
-            <h2 className="text-2xl font-orbitron font-bold tracking-wide text-black truncate">Results Stats Dashboard</h2>
+            <h2
+              id="ab-stats-modal-title"
+              className="text-2xl font-orbitron font-bold tracking-wide text-black truncate"
+            >
+              Results Stats Dashboard
+            </h2>
             <p className="text-sm font-mono text-gray-500 mt-2 truncate">{normalized.repoName}</p>
             <div className="flex flex-wrap items-center gap-3 mt-3 text-xs font-mono text-gray-600">
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-gray-200 bg-gray-50">
@@ -194,8 +243,9 @@ export default function ABResultStatsModal({ isOpen, onClose, data }: ABResultSt
               {normalized.passed ? "Performance Win" : "Performance Regression"}
             </span>
             <button
+              type="button"
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-md transition-colors"
+              className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
               aria-label="Close stats modal"
             >
               <X size={20} />
@@ -203,12 +253,24 @@ export default function ABResultStatsModal({ isOpen, onClose, data }: ABResultSt
           </div>
         </div>
 
-        <div className="overflow-y-auto p-8 space-y-8 scrollbtn">
+        <div className="overflow-y-auto overscroll-contain p-6 sm:p-8 space-y-8 scrollbtn">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <DeltaStatCard label="RPS Delta" value={`${toFixedSafe(rpsDelta)}%`} positive={rpsDelta >= 0} />
-            <DeltaStatCard label="Avg Latency Delta" value={`${toFixedSafe(avgLatencyDelta)}%`} positive={avgLatencyDelta <= 0} />
-            <DeltaStatCard label="P99 Latency Delta" value={`${toFixedSafe(p99Delta)}%`} positive={p99Delta <= 0} />
-            <DeltaStatCard label="Success Rate Delta" value={`${toFixedSafe(successDelta)}%`} positive={successDelta >= 0} />
+            <DeltaStatCard
+              label="Avg Latency Delta"
+              value={`${toFixedSafe(avgLatencyDelta)}%`}
+              positive={avgLatencyDelta <= 0}
+            />
+            <DeltaStatCard
+              label="P99 Latency Delta"
+              value={`${toFixedSafe(p99Delta)}%`}
+              positive={p99Delta <= 0}
+            />
+            <DeltaStatCard
+              label="Success Rate Delta"
+              value={`${toFixedSafe(successDelta)}%`}
+              positive={successDelta >= 0}
+            />
           </div>
 
           <div className="grid lg:grid-cols-2 gap-6">
@@ -227,7 +289,7 @@ export default function ABResultStatsModal({ isOpen, onClose, data }: ABResultSt
             </section>
 
             <section className="bg-gray-50 border border-gray-200 rounded-xl p-5">
-              <h3 className="font-bold text-gray-800 mb-4">Performance Profile</h3>
+              <h3 className="font-bold text-gray-800 mb-4">Normalized Performance Profile</h3>
               <div className="h-[320px]">
                 <Radar
                   data={radarData}
@@ -237,6 +299,7 @@ export default function ABResultStatsModal({ isOpen, onClose, data }: ABResultSt
                     scales: {
                       r: {
                         beginAtZero: true,
+                        max: 100,
                         ticks: { backdropColor: "transparent" },
                       },
                     },
@@ -247,14 +310,14 @@ export default function ABResultStatsModal({ isOpen, onClose, data }: ABResultSt
             </section>
           </div>
 
-          <section className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
+          <section className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+            <table className="w-full text-sm text-gray-900">
               <thead className="bg-gray-50 text-gray-700 uppercase tracking-wider text-xs">
                 <tr>
-                  <th className="text-left px-4 py-3">Metric</th>
-                  <th className="text-left px-4 py-3">{normalized.baselineBranch}</th>
-                  <th className="text-left px-4 py-3">{normalized.candidateBranch}</th>
-                  <th className="text-left px-4 py-3">Delta</th>
+                  <th scope="col" className="text-left px-4 py-3">Metric</th>
+                  <th scope="col" className="text-left px-4 py-3">{normalized.baselineBranch}</th>
+                  <th scope="col" className="text-left px-4 py-3">{normalized.candidateBranch}</th>
+                  <th scope="col" className="text-left px-4 py-3">Delta</th>
                 </tr>
               </thead>
               <tbody>
@@ -295,11 +358,21 @@ export default function ABResultStatsModal({ isOpen, onClose, data }: ABResultSt
   );
 }
 
-function DeltaStatCard({ label, value, positive }: { label: string; value: string; positive: boolean }) {
+function DeltaStatCard({
+  label,
+  value,
+  positive,
+}: {
+  label: string;
+  value: string;
+  positive: boolean;
+}) {
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4">
       <p className="text-xs uppercase tracking-wider text-gray-500 font-mono">{label}</p>
-      <p className={`mt-2 text-2xl font-bold ${positive ? "text-emerald-600" : "text-red-600"}`}>{value}</p>
+      <p className={`mt-2 text-2xl font-bold ${positive ? "text-emerald-600" : "text-red-600"}`}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -323,8 +396,12 @@ function MetricRow({
   return (
     <tr className="border-t border-gray-100">
       <td className="px-4 py-3 text-gray-700">{label}</td>
-      <td className="px-4 py-3 font-mono">{toFixedSafe(baseline)} {unit}</td>
-      <td className="px-4 py-3 font-mono">{toFixedSafe(candidate)} {unit}</td>
+      <td className="px-4 py-3 font-mono text-gray-900">
+        {toFixedSafe(baseline)} {unit}
+      </td>
+      <td className="px-4 py-3 font-mono text-gray-900">
+        {toFixedSafe(candidate)} {unit}
+      </td>
       <td className={`px-4 py-3 font-mono font-bold ${isGood ? "text-emerald-600" : "text-red-600"}`}>
         {toFixedSafe(delta)}%
       </td>

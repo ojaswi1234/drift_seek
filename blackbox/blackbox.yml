@@ -11,7 +11,6 @@ modules:
       valid_status_codes: [200, 201, 202, 204]
       method: GET
       follow_redirects: true
-      no_follow_redirects: false
       fail_if_ssl: false
       fail_if_not_ssl: false
       tls_config:

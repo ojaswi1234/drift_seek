@@ -1,136 +1,168 @@
 /**
  * Blackbox Metrics Collector for DriftSeeker
- * 
- * This service:
- * 1. Periodically scrapes metrics from Blackbox Exporter
- * 2. Stores probe results in MongoDB for historical analysis
- * 3. Provides a REST API for querying stored metrics
- * 4. Integrates with Grafana Cloud Prometheus for alerting
  */
 
 import { MongoClient } from 'mongodb';
 import fetch from 'node-fetch';
+import promClient from 'prom-client';
 
-// Configuration with validation
 function validateConfig() {
   const required = ['MONGODB_URI', 'BLACKBOX_URL'];
-  const missing = required.filter(key => !process.env[key]);
-  
+  const missing = required.filter((key) => !process.env[key]);
+
   if (missing.length > 0) {
     console.error('❌ Missing required environment variables:', missing.join(', '));
-    console.error('   Please set:', missing.map(m => `${m}=<value>`).join(' '));
     process.exit(1);
   }
-  
+
   return {
-    // Blackbox Exporter
     BLACKBOX_URL: process.env.BLACKBOX_URL,
-    
-    // MongoDB
     MONGODB_URI: process.env.MONGODB_URI,
     DB_NAME: process.env.DB_NAME || 'system_seek',
     COLLECTION_NAME: 'blackbox_probes',
-    
-    // Collection interval (ms)
-    COLLECTION_INTERVAL: parseInt(process.env.COLLECTION_INTERVAL || '60000'), // 1 minute
-    
-    // Targets to probe (can be overridden via env)
+    COLLECTION_INTERVAL: parseInt(process.env.COLLECTION_INTERVAL || '60000', 10),
     TARGETS: [
       { name: 'app', url: process.env.APP_URL || 'http://localhost:3000', module: 'http_2xx' },
-      { name: 'terminal-server', url: process.env.TERMINAL_URL || 'http://localhost:3001', module: 'http_2xx' },
-      { name: 'grpc-worker', url: process.env.GRPC_URL || 'localhost:50051', module: 'grpc_health' },
+      {
+        name: 'terminal-server',
+        url: process.env.TERMINAL_URL || 'http://localhost:3001/health',
+        module: 'http_2xx',
+      },
+      { name: 'grpc-worker', url: process.env.GRPC_URL || 'localhost:50051', module: 'grpc' },
       { name: 'mongodb', url: process.env.MONGO_URL || 'localhost:27017', module: 'mongodb' },
       { name: 'redis', url: process.env.REDIS_URL || 'localhost:6379', module: 'redis' },
-    ].filter(t => t.url),
-    
-    // Server
-    PORT: parseInt(process.env.PORT || '9116'),
-    
-    // MongoDB connection options
-    MONGO_CONNECT_TIMEOUT: parseInt(process.env.MONGO_CONNECT_TIMEOUT || '10000'),
-    MONGO_MAX_POOL_SIZE: parseInt(process.env.MONGO_MAX_POOL_SIZE || '10'),
-    MONGO_RETRY_ATTEMPTS: parseInt(process.env.MONGO_RETRY_ATTEMPTS || '5'),
-    MONGO_RETRY_DELAY: parseInt(process.env.MONGO_RETRY_DELAY || '5000'),
+    ].filter((t) => t.url),
+    PORT: parseInt(process.env.PORT || '9116', 10),
+    ALLOWED_ORIGIN: process.env.ALLOWED_ORIGIN || '',
+    METRICS_API_TOKEN: process.env.METRICS_API_TOKEN || '',
+    MONGO_CONNECT_TIMEOUT: parseInt(process.env.MONGO_CONNECT_TIMEOUT || '10000', 10),
+    MONGO_MAX_POOL_SIZE: parseInt(process.env.MONGO_MAX_POOL_SIZE || '10', 10),
+    MONGO_RETRY_ATTEMPTS: parseInt(process.env.MONGO_RETRY_ATTEMPTS || '5', 10),
+    MONGO_RETRY_DELAY: parseInt(process.env.MONGO_RETRY_DELAY || '5000', 10),
   };
 }
 
 const CONFIG = validateConfig();
 
-// MongoDB connection state
+const register = new promClient.Registry();
+const probeSuccessGauge = new promClient.Gauge({
+  name: 'blackbox_probe_success',
+  help: 'Displays whether or not the probe was a success (1 = up, 0 = down)',
+  labelNames: ['target', 'module'],
+  registers: [register],
+});
+const probeDurationGauge = new promClient.Gauge({
+  name: 'blackbox_probe_duration_seconds',
+  help: 'Returns how long the probe took to complete in seconds',
+  labelNames: ['target', 'module'],
+  registers: [register],
+});
+const probeHttpStatusGauge = new promClient.Gauge({
+  name: 'blackbox_probe_http_status_code',
+  help: 'Response HTTP status code for HTTP probes',
+  labelNames: ['target', 'module'],
+  registers: [register],
+});
+const mongoConnectedGauge = new promClient.Gauge({
+  name: 'blackbox_collector_mongodb_connected',
+  help: 'Whether MongoDB is connected (1 = yes, 0 = no)',
+  registers: [register],
+});
+const blackboxReachableGauge = new promClient.Gauge({
+  name: 'blackbox_collector_blackbox_reachable',
+  help: 'Whether Blackbox Exporter is reachable (1 = yes, 0 = no)',
+  registers: [register],
+});
+const lastCollectionGauge = new promClient.Gauge({
+  name: 'blackbox_collector_last_collection_timestamp',
+  help: 'Unix timestamp (ms) of the last metrics collection',
+  registers: [register],
+});
+
 let db = null;
 let collection = null;
 let mongoClient = null;
 let isShuttingDown = false;
+let isConnecting = false;
 
-// Health status
-let healthStatus = {
+const healthStatus = {
   mongo: false,
   blackbox: false,
   lastCollection: null,
-  lastError: null
+  lastError: null,
 };
 
-// Connect to MongoDB with retry logic
 async function connectMongo(attempt = 1) {
-  if (isShuttingDown) return false;
-  
+  if (isShuttingDown || isConnecting) return false;
+  isConnecting = true;
+
   try {
+    if (mongoClient) {
+      await mongoClient.close().catch(() => {});
+      mongoClient = null;
+    }
+
     mongoClient = new MongoClient(CONFIG.MONGODB_URI, {
       connectTimeoutMS: CONFIG.MONGO_CONNECT_TIMEOUT,
       maxPoolSize: CONFIG.MONGO_MAX_POOL_SIZE,
       serverSelectionTimeoutMS: CONFIG.MONGO_CONNECT_TIMEOUT,
     });
-    
+
     await mongoClient.connect();
     db = mongoClient.db(CONFIG.DB_NAME);
     collection = db.collection(CONFIG.COLLECTION_NAME);
-    
-    // Create indexes for efficient querying
+
     await collection.createIndex({ target: 1, timestamp: -1 });
     await collection.createIndex({ timestamp: -1 });
     await collection.createIndex({ module: 1, timestamp: -1 });
-    
-    // Verify connection with a ping
+
     await db.command({ ping: 1 });
-    
+
     healthStatus.mongo = true;
     healthStatus.lastError = null;
+    mongoConnectedGauge.set(1);
     console.log('✅ Connected to MongoDB');
     return true;
   } catch (error) {
     healthStatus.mongo = false;
     healthStatus.lastError = error.message;
-    console.error(`❌ MongoDB connection failed (attempt ${attempt}/${CONFIG.MONGO_RETRY_ATTEMPTS}):`, error.message);
-    
+    mongoConnectedGauge.set(0);
+    console.error(
+      `❌ MongoDB connection failed (attempt ${attempt}/${CONFIG.MONGO_RETRY_ATTEMPTS}):`,
+      error.message
+    );
+
     if (attempt < CONFIG.MONGO_RETRY_ATTEMPTS && !isShuttingDown) {
-      console.log(`⏳ Retrying in ${CONFIG.MONGO_RETRY_DELAY}ms...`);
-      await new Promise(resolve => setTimeout(resolve, CONFIG.MONGO_RETRY_DELAY));
+      isConnecting = false;
+      await new Promise((resolve) => setTimeout(resolve, CONFIG.MONGO_RETRY_DELAY));
       return connectMongo(attempt + 1);
     }
-    
     return false;
+  } finally {
+    isConnecting = false;
   }
 }
 
-// Probe a single target using Blackbox Exporter
 async function probeTarget(target) {
-  const probeUrl = `${CONFIG.BLACKBOX_URL}/probe?target=${encodeURIComponent(target.url)}&module=${target.module}`;
-  
+  const probeUrl = `${CONFIG.BLACKBOX_URL}/probe?target=${encodeURIComponent(
+    target.url
+  )}&module=${encodeURIComponent(target.module)}`;
+
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
-    
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     const response = await fetch(probeUrl, {
-      headers: { 'Accept': 'text/plain' },
-      signal: controller.signal
+      headers: { Accept: 'text/plain' },
+      signal: controller.signal,
     });
-    
+
     clearTimeout(timeoutId);
-    
+
     if (!response.ok) {
       throw new Error(`Blackbox returned ${response.status}: ${response.statusText}`);
     }
-    
+
     const text = await response.text();
     return parsePrometheusMetrics(text, target);
   } catch (error) {
@@ -141,34 +173,40 @@ async function probeTarget(target) {
       module: target.module,
       timestamp: new Date(),
       success: false,
+      duration_seconds: 0,
+      http_status_code: 0,
       error: error.message,
-      metrics: {}
+      metrics: {},
     };
   }
 }
 
-// Parse Prometheus text format metrics
 function parsePrometheusMetrics(text, target) {
   const metrics = {};
   const lines = text.split('\n');
-  
+
   for (const line of lines) {
-    // Skip comments and empty lines
     if (line.startsWith('#') || !line.trim()) continue;
-    
-    // Parse metric line: metric_name{labels} value
-    const match = line.match(/^(\w+)(?:\{([^}]*)\})?\s+([\d.+-eE]+)$/);
+    const match = line.match(
+      /^([a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{([^}]*)\})?\s+([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?|NaN|[+-]Inf)(?:\s+\d+)?$/
+    );
     if (match) {
-      const [, name, labels, value] = match;
-      metrics[name] = parseFloat(value);
+      const [, name, , rawValue] = match;
+      const numericValue = Number(rawValue);
+      if (Number.isFinite(numericValue) && !(name in metrics)) {
+        metrics[name] = numericValue;
+      }
     }
   }
-  
-  // Extract key metrics
+
   const success = metrics.probe_success === 1;
-  const duration = metrics.probe_duration_seconds || 0;
-  const httpStatus = metrics.probe_http_status_code || 0;
-  
+  const duration = Number.isFinite(metrics.probe_duration_seconds)
+    ? metrics.probe_duration_seconds
+    : 0;
+  const httpStatus = Number.isFinite(metrics.probe_http_status_code)
+    ? metrics.probe_http_status_code
+    : 0;
+
   return {
     target: target.name,
     url: target.url,
@@ -178,21 +216,32 @@ function parsePrometheusMetrics(text, target) {
     duration_seconds: duration,
     http_status_code: httpStatus,
     metrics,
-    error: success ? null : 'Probe failed'
+    error: success ? null : 'Probe failed',
   };
 }
 
-// Collect metrics from all targets
 async function collectMetrics() {
   if (isShuttingDown) return [];
-  
+
   console.log(`🔍 Starting metrics collection for ${CONFIG.TARGETS.length} targets...`);
-  
-  const results = await Promise.all(
-    CONFIG.TARGETS.map(target => probeTarget(target))
-  );
-  
-  // Store in MongoDB if connected
+
+  const results = await Promise.all(CONFIG.TARGETS.map((target) => probeTarget(target)));
+
+  for (const r of results) {
+    probeSuccessGauge.set({ target: r.target, module: r.module }, r.success ? 1 : 0);
+    probeDurationGauge.set(
+      { target: r.target, module: r.module },
+      Number.isFinite(r.duration_seconds) ? r.duration_seconds : 0
+    );
+    if (r.http_status_code > 0) {
+      probeHttpStatusGauge.set({ target: r.target, module: r.module }, r.http_status_code);
+    }
+  }
+
+  if (!collection || !healthStatus.mongo) {
+    await connectMongo(1);
+  }
+
   if (collection && healthStatus.mongo) {
     try {
       await collection.insertMany(results);
@@ -201,118 +250,148 @@ async function collectMetrics() {
       console.error('❌ Failed to store metrics:', error.message);
       healthStatus.mongo = false;
       healthStatus.lastError = error.message;
-      
-      // Try to reconnect
-      if (!isShuttingDown) {
-        console.log('🔄 Attempting to reconnect to MongoDB...');
-        await connectMongo();
-      }
+      mongoConnectedGauge.set(0);
+      await connectMongo(1);
     }
   } else {
     console.warn('⚠️ MongoDB not connected, skipping metric storage');
   }
-  
-  // Log summary
-  const successful = results.filter(r => r.success).length;
-  const failed = results.filter(r => !r.success).length;
-  console.log(`📊 Collection complete: ${successful} success, ${failed} failed`);
-  
-  healthStatus.lastCollection = new Date();
-  
+
+  const now = new Date();
+  healthStatus.lastCollection = now;
+  lastCollectionGauge.set(now.getTime());
+
   return results;
 }
 
-// Check Blackbox Exporter health
 async function checkBlackboxHealth() {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
-    
+
     const response = await fetch(`${CONFIG.BLACKBOX_URL}/health`, {
-      signal: controller.signal
+      signal: controller.signal,
     });
-    
+
     clearTimeout(timeoutId);
     healthStatus.blackbox = response.ok;
+    blackboxReachableGauge.set(response.ok ? 1 : 0);
     return response.ok;
-  } catch (error) {
+  } catch {
     healthStatus.blackbox = false;
+    blackboxReachableGauge.set(0);
     return false;
   }
 }
 
-// REST API for querying stored metrics
+async function checkMongoHealth() {
+  if (!db || !mongoClient) return false;
+  try {
+    await db.command({ ping: 1 });
+    healthStatus.mongo = true;
+    mongoConnectedGauge.set(1);
+    return true;
+  } catch {
+    healthStatus.mongo = false;
+    mongoConnectedGauge.set(0);
+    return false;
+  }
+}
+
+function clampInt(raw, defaultVal, min, max) {
+  const num = parseInt(String(raw ?? ''), 10);
+  if (Number.isNaN(num)) return defaultVal;
+  return Math.min(max, Math.max(min, num));
+}
+
 async function startApiServer() {
   const http = await import('http');
   const url = await import('url');
-  
+
   const server = http.createServer(async (req, res) => {
-    const parsedUrl = url.parse(req.url, true);
-    
-    // CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    
+    const parsedUrl = url.parse(req.url || '/', true);
+
+    if (CONFIG.ALLOWED_ORIGIN) {
+      res.setHeader('Access-Control-Allow-Origin', CONFIG.ALLOWED_ORIGIN);
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    }
+
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
       res.end();
       return;
     }
-    
+
+    if (
+      CONFIG.METRICS_API_TOKEN &&
+      parsedUrl.pathname !== '/health' &&
+      req.headers.authorization !== `Bearer ${CONFIG.METRICS_API_TOKEN}`
+    ) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized' }));
+      return;
+    }
+
     try {
-      // Health check endpoint - verifies both MongoDB and Blackbox
       if (parsedUrl.pathname === '/health') {
-        const mongoOk = healthStatus.mongo && mongoClient && mongoClient.topology?.isConnected();
-        const blackboxOk = await checkBlackboxHealth();
-        
+        const [mongoOk, blackboxOk] = await Promise.all([
+          checkMongoHealth(),
+          checkBlackboxHealth(),
+        ]);
+
         const status = mongoOk && blackboxOk ? 'ok' : 'degraded';
         const statusCode = mongoOk && blackboxOk ? 200 : 503;
-        
+
         res.writeHead(statusCode, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          status,
-          timestamp: new Date().toISOString(),
-          checks: {
-            mongodb: mongoOk ? 'connected' : 'disconnected',
-            blackbox: blackboxOk ? 'reachable' : 'unreachable',
-            lastCollection: healthStatus.lastCollection,
-            lastError: healthStatus.lastError
-          }
-        }));
+        res.end(
+          JSON.stringify({
+            status,
+            timestamp: new Date().toISOString(),
+            checks: {
+              mongodb: mongoOk ? 'connected' : 'disconnected',
+              blackbox: blackboxOk ? 'reachable' : 'unreachable',
+              lastCollection: healthStatus.lastCollection,
+            },
+          })
+        );
         return;
       }
-      
-      // Only serve metrics endpoints if MongoDB is connected
-      if (!healthStatus.mongo && parsedUrl.pathname !== '/metrics') {
+
+      if (parsedUrl.pathname === '/metrics') {
+        res.writeHead(200, { 'Content-Type': register.contentType });
+        res.end(await register.metrics());
+        return;
+      }
+
+      if (!healthStatus.mongo || !collection) {
         res.writeHead(503, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
-          error: 'Service unavailable - MongoDB not connected',
-          retryAfter: 30
-        }));
+        res.end(
+          JSON.stringify({
+            error: 'Service unavailable - MongoDB not connected',
+            retryAfter: 30,
+          })
+        );
         return;
       }
-      
+
       if (parsedUrl.pathname === '/api/metrics/latest') {
-        const limit = parseInt(parsedUrl.query.limit) || 100;
-        const target = parsedUrl.query.target;
-        
+        const limit = clampInt(parsedUrl.query.limit, 100, 1, 1000);
+        const rawTarget = parsedUrl.query.target;
+        const target = typeof rawTarget === 'string' && rawTarget.trim() ? rawTarget.trim() : null;
+
         const query = target ? { target } : {};
-        const docs = await collection
-          .find(query)
-          .sort({ timestamp: -1 })
-          .limit(limit)
-          .toArray();
-        
+        const docs = await collection.find(query).sort({ timestamp: -1 }).limit(limit).toArray();
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(docs));
         return;
       }
-      
+
       if (parsedUrl.pathname === '/api/metrics/summary') {
-        const hours = parseInt(parsedUrl.query.hours) || 24;
+        const hours = clampInt(parsedUrl.query.hours, 24, 1, 720);
         const since = new Date(Date.now() - hours * 60 * 60 * 1000);
-        
+
         const pipeline = [
           { $match: { timestamp: { $gte: since } } },
           {
@@ -322,157 +401,96 @@ async function startApiServer() {
               successful: { $sum: { $cond: ['$success', 1, 0] } },
               failed: { $sum: { $cond: ['$success', 0, 1] } },
               avgDuration: { $avg: '$duration_seconds' },
-              lastCheck: { $max: '$timestamp' }
-            }
-          }
+              lastCheck: { $max: '$timestamp' },
+            },
+          },
         ];
-        
+
         const summary = await collection.aggregate(pipeline).toArray();
-        
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(summary));
         return;
       }
-      
+
       if (parsedUrl.pathname === '/api/metrics/history') {
-        const target = parsedUrl.query.target;
-        const hours = parseInt(parsedUrl.query.hours) || 24;
+        const rawTarget = parsedUrl.query.target;
+        const target = typeof rawTarget === 'string' ? rawTarget.trim() : '';
+        const hours = clampInt(parsedUrl.query.hours, 24, 1, 720);
+        const limit = clampInt(parsedUrl.query.limit, 1000, 1, 5000);
         const since = new Date(Date.now() - hours * 60 * 60 * 1000);
-        
+
         if (!target) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'target parameter required' }));
           return;
         }
-        
+
         const docs = await collection
           .find({ target, timestamp: { $gte: since } })
           .sort({ timestamp: 1 })
+          .limit(limit)
           .toArray();
-        
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(docs));
         return;
       }
-      
-      // Prometheus metrics endpoint for Grafana Cloud scraping
-      if (parsedUrl.pathname === '/metrics') {
-        // This endpoint works even without MongoDB - returns last known state
-        let output = '';
-        
-        if (healthStatus.mongo && collection) {
-          const docs = await collection
-            .find({})
-            .sort({ timestamp: -1 })
-            .limit(1000)
-            .toArray();
-          
-          for (const doc of docs) {
-            const labels = `target="${doc.target}",module="${doc.module}"`;
-            output += `blackbox_probe_success{${labels}} ${doc.success ? 1 : 0}\n`;
-            output += `blackbox_probe_duration_seconds{${labels}} ${doc.duration_seconds}\n`;
-            if (doc.http_status_code) {
-              output += `blackbox_probe_http_status_code{${labels}} ${doc.http_status_code}\n`;
-            }
-          }
-        }
-        
-        // Add collector health metrics
-        output += `blackbox_collector_mongodb_connected ${healthStatus.mongo ? 1 : 0}\n`;
-        output += `blackbox_collector_blackbox_reachable ${healthStatus.blackbox ? 1 : 0}\n`;
-        output += `blackbox_collector_last_collection_timestamp ${healthStatus.lastCollection ? new Date(healthStatus.lastCollection).getTime() : 0}\n`;
-        
-        res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4' });
-        res.end(output);
-        return;
-      }
-      
+
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Not found' }));
     } catch (error) {
       console.error('API error:', error);
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: error.message }));
+      res.end(JSON.stringify({ error: 'Internal server error' }));
     }
   });
-  
+
   server.listen(CONFIG.PORT, () => {
     console.log(`🌐 API server running on port ${CONFIG.PORT}`);
-    console.log(`   Health: http://localhost:${CONFIG.PORT}/health`);
-    console.log(`   Latest metrics: http://localhost:${CONFIG.PORT}/api/metrics/latest`);
-    console.log(`   Summary: http://localhost:${CONFIG.PORT}/api/metrics/summary`);
-    console.log(`   Prometheus metrics: http://localhost:${CONFIG.PORT}/metrics`);
   });
-  
+
   return server;
 }
 
-// Main function
 async function main() {
-  console.log('🚀 Starting Blackbox Metrics Collector');
-  console.log('=====================================');
-  console.log(`Blackbox URL: ${CONFIG.BLACKBOX_URL}`);
-  console.log(`MongoDB: ${CONFIG.MONGODB_URI}/${CONFIG.DB_NAME}`);
-  console.log(`Collection interval: ${CONFIG.COLLECTION_INTERVAL}ms`);
-  console.log(`Targets: ${CONFIG.TARGETS.map(t => t.name).join(', ')}`);
-  console.log('');
-  
-  // Connect to MongoDB with retries
   const connected = await connectMongo();
   if (!connected) {
     console.error('❌ Cannot continue without MongoDB after retries');
-    console.error('   Check MONGODB_URI and network connectivity');
     process.exit(1);
   }
-  
-  // Start API server
+
   const server = await startApiServer();
-  
-  // Initial collection
   await collectMetrics();
-  
-  // Schedule periodic collection
+
   const intervalId = setInterval(collectMetrics, CONFIG.COLLECTION_INTERVAL);
-  console.log(`⏰ Scheduled collection every ${CONFIG.COLLECTION_INTERVAL}ms`);
-  
-  // Graceful shutdown
+
   async function shutdown(signal) {
     if (isShuttingDown) return;
     isShuttingDown = true;
-    
     console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
-    
     clearInterval(intervalId);
-    
-    // Close HTTP server
-    await new Promise(resolve => server.close(resolve));
-    console.log('✅ HTTP server closed');
-    
-    // Close MongoDB connection
+    await new Promise((resolve) => server.close(resolve));
     if (mongoClient) {
       await mongoClient.close();
-      console.log('✅ MongoDB connection closed');
     }
-    
-    console.log('✅ Shutdown complete');
     process.exit(0);
   }
-  
+
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
-  
-  // Handle uncaught errors
+
   process.on('uncaughtException', (error) => {
     console.error('💥 Uncaught exception:', error);
     shutdown('uncaughtException').catch(() => process.exit(1));
   });
-  
+
   process.on('unhandledRejection', (reason) => {
     console.error('💥 Unhandled rejection:', reason);
   });
 }
 
-main().catch(error => {
+main().catch((error) => {
   console.error('💥 Fatal error:', error);
   process.exit(1);
 });

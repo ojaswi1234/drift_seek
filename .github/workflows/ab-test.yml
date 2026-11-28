@@ -32,8 +32,7 @@ on:
 jobs:
   ab-performance-test:
     runs-on: ubuntu-latest
-    
-    # 1. Spin up a local MongoDB container for MERN backends to connect to
+
     services:
       mongodb:
         image: mongo:latest
@@ -41,6 +40,28 @@ jobs:
           - 27017:27017
 
     steps:
+      - name: Validate Workflow Inputs
+        env:
+          INPUT_REPO: ${{ github.event.inputs.target_repo }}
+          INPUT_BASE: ${{ github.event.inputs.baseline_branch }}
+          INPUT_CAND: ${{ github.event.inputs.candidate_branch }}
+          INPUT_TEST_URL: ${{ github.event.inputs.test_url }}
+          INPUT_API_URL: ${{ github.event.inputs.seek_api_url }}
+          INPUT_BUILD_CMD: ${{ github.event.inputs.build_command }}
+          INPUT_START_CMD: ${{ github.event.inputs.start_command }}
+        run: |
+          node -e '
+            const repoRe = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
+            const branchRe = /^(?!-)(?!.*\.\.)[a-zA-Z0-9_.-]+(\/[a-zA-Z0-9_.-]+)*$/;
+            const cmdRe = /^[a-zA-Z0-9\s._:/=@&-]+$/;
+            if (!repoRe.test(process.env.INPUT_REPO)) throw new Error("Invalid target_repo");
+            if (!branchRe.test(process.env.INPUT_BASE) || !branchRe.test(process.env.INPUT_CAND)) throw new Error("Invalid branch");
+            new URL(process.env.INPUT_TEST_URL);
+            new URL(process.env.INPUT_API_URL);
+            if (process.env.INPUT_BUILD_CMD && !cmdRe.test(process.env.INPUT_BUILD_CMD)) throw new Error("Unsafe build_command");
+            if (!cmdRe.test(process.env.INPUT_START_CMD)) throw new Error("Unsafe start_command");
+          '
+
       - name: System Setup
         run: |
           sudo apt-get update
@@ -62,6 +83,8 @@ jobs:
 
       - name: Build Baseline
         working-directory: ./baseline
+        env:
+          BUILD_COMMAND: ${{ github.event.inputs.build_command }}
         run: |
           if [ -d "server" ] && [ -d "client" ]; then
             echo "==> MERN Stack Detected (server/client) <=="
@@ -73,11 +96,14 @@ jobs:
             (cd frontend && npm install --legacy-peer-deps && npm run build --if-present)
           else
             echo "==> Single-Process App Detected <=="
-            ${{ github.event.inputs.build_command }}
+            bash -c "$BUILD_COMMAND"
           fi
 
       - name: Start Baseline Server
         working-directory: ./baseline
+        env:
+          TEST_URL: ${{ github.event.inputs.test_url }}
+          START_COMMAND: ${{ github.event.inputs.start_command }}
         run: |
           if [ -d "server" ] && [ -d "client" ]; then
             npx kill-port 3000 5000 5173 || true
@@ -94,21 +120,21 @@ jobs:
             echo "TARGET_TEST_URL=http://localhost:5000" >> $GITHUB_ENV
             echo "TARGET_PORTS=3000 5000 5173" >> $GITHUB_ENV
           else
-            TEST_PORT=$(echo "${{ github.event.inputs.test_url }}" | sed -E 's#.*:([0-9]+).*#\1#')
+            TEST_PORT=$(node -e "const u = new URL(process.env.TEST_URL); console.log(u.port || (u.protocol === 'https:' ? 443 : 80));")
             npx kill-port "$TEST_PORT" || true
-            ${{ github.event.inputs.start_command }} &
-            wait-on ${{ github.event.inputs.test_url }} -t 60000
-            echo "TARGET_TEST_URL=${{ github.event.inputs.test_url }}" >> $GITHUB_ENV
+            bash -c "$START_COMMAND" &
+            wait-on "$TEST_URL" -t 60000
+            echo "TARGET_TEST_URL=$TEST_URL" >> $GITHUB_ENV
             echo "TARGET_PORTS=$TEST_PORT" >> $GITHUB_ENV
           fi
 
       - name: Load Test Baseline (A)
         run: |
           echo "Running warm-up on $TARGET_TEST_URL..."
-          autocannon -c 10 -d 5 $TARGET_TEST_URL
+          autocannon -c 10 -d 5 "$TARGET_TEST_URL"
           echo "Running Baseline Load Test..."
-          autocannon -c 100 -d 30 -j $TARGET_TEST_URL > baseline-results.json
-        
+          autocannon -c 100 -d 30 -j "$TARGET_TEST_URL" > baseline-results.json
+
       - name: Stop Baseline Server
         run: npx kill-port $TARGET_PORTS || true
 
@@ -122,6 +148,8 @@ jobs:
 
       - name: Build Candidate
         working-directory: ./candidate
+        env:
+          BUILD_COMMAND: ${{ github.event.inputs.build_command }}
         run: |
           if [ -d "server" ] && [ -d "client" ]; then
             echo "==> MERN Stack Detected (server/client) <=="
@@ -133,11 +161,14 @@ jobs:
             (cd frontend && npm install --legacy-peer-deps && npm run build --if-present)
           else
             echo "==> Single-Process App Detected <=="
-            ${{ github.event.inputs.build_command }}
+            bash -c "$BUILD_COMMAND"
           fi
 
       - name: Start Candidate Server
         working-directory: ./candidate
+        env:
+          TEST_URL: ${{ github.event.inputs.test_url }}
+          START_COMMAND: ${{ github.event.inputs.start_command }}
         run: |
           if [ -d "server" ] && [ -d "client" ]; then
             npx kill-port 3000 5000 5173 || true
@@ -154,21 +185,21 @@ jobs:
             echo "TARGET_TEST_URL=http://localhost:5000" >> $GITHUB_ENV
             echo "TARGET_PORTS=3000 5000 5173" >> $GITHUB_ENV
           else
-            TEST_PORT=$(echo "${{ github.event.inputs.test_url }}" | sed -E 's#.*:([0-9]+).*#\1#')
+            TEST_PORT=$(node -e "const u = new URL(process.env.TEST_URL); console.log(u.port || (u.protocol === 'https:' ? 443 : 80));")
             npx kill-port "$TEST_PORT" || true
-            ${{ github.event.inputs.start_command }} &
-            wait-on ${{ github.event.inputs.test_url }} -t 60000
-            echo "TARGET_TEST_URL=${{ github.event.inputs.test_url }}" >> $GITHUB_ENV
+            bash -c "$START_COMMAND" &
+            wait-on "$TEST_URL" -t 60000
+            echo "TARGET_TEST_URL=$TEST_URL" >> $GITHUB_ENV
             echo "TARGET_PORTS=$TEST_PORT" >> $GITHUB_ENV
           fi
 
       - name: Load Test Candidate (B)
         run: |
           echo "Running warm-up on $TARGET_TEST_URL..."
-          autocannon -c 10 -d 5 $TARGET_TEST_URL
+          autocannon -c 10 -d 5 "$TARGET_TEST_URL"
           echo "Running Candidate Load Test..."
-          autocannon -c 100 -d 30 -j $TARGET_TEST_URL > candidate-results.json
-        
+          autocannon -c 100 -d 30 -j "$TARGET_TEST_URL" > candidate-results.json
+
       - name: Stop Candidate Server
         run: npx kill-port $TARGET_PORTS || true
 
@@ -182,4 +213,15 @@ jobs:
       - name: Evaluate A/B Test Gates
         env:
           SEEK_API_TOKEN: ${{ secrets.SEEK_API_TOKEN }}
-        run: node tools/scripts/ab-platform/evaluate.js ./baseline-results.json ./candidate-results.json "${{ github.event.inputs.seek_api_url }}/api/abtest/results" "https://github.com/${{ github.event.inputs.target_repo }}" "${{ github.event.inputs.baseline_branch }}" "${{ github.event.inputs.candidate_branch }}"
+          SEEK_API_URL: ${{ github.event.inputs.seek_api_url }}
+          TARGET_REPO: ${{ github.event.inputs.target_repo }}
+          BASELINE_BRANCH: ${{ github.event.inputs.baseline_branch }}
+          CANDIDATE_BRANCH: ${{ github.event.inputs.candidate_branch }}
+        run: |
+          node tools/scripts/ab-platform/evaluate.js \
+            ./baseline-results.json \
+            ./candidate-results.json \
+            "${SEEK_API_URL%/}/api/abtest/results" \
+            "https://github.com/${TARGET_REPO}" \
+            "${BASELINE_BRANCH}" \
+            "${CANDIDATE_BRANCH}"

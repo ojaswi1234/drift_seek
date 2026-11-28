@@ -1,31 +1,48 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-import { NextResponse } from 'next/server';
-import dbConnect from '../../../../lib/db_connect';
-import WebServer from '../../../../lib/models/WebServer';
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import dbConnect from '@/lib/db_connect';
+import WebServer from '@/lib/models/WebServer';
 import redis from '@/lib/redis';
 import { pingMonitorSchema } from '@/lib/validation/schemas';
-import { grpcClient } from '@/lib/grpc_client';
+import { checkTargetViaGrpc } from '@/lib/grpc_client';
+import { parseJsonBody, safeTimingEqual } from '@/lib/auth/session';
+import { validateAndResolveUrl } from '@/lib/security/urlValidator';
 
-
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    await dbConnect();
-    const body = await req.json();
+    const expectedToken = (process.env.SEEK_API_TOKEN || '').trim();
+    const incomingToken = (req.headers.get('x-seek-api-token') || '').trim();
+    const isInternalAuthorized = Boolean(
+      expectedToken && incomingToken && safeTimingEqual(incomingToken, expectedToken)
+    );
 
-    const validationResult = pingMonitorSchema.safeParse(body);
+    const session = isInternalAuthorized ? null : await getServerSession(authOptions);
+    if (!isInternalAuthorized && !session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const parsedBody = await parseJsonBody(req);
+    if (!parsedBody.ok) {
+      return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+    }
+
+    const validationResult = pingMonitorSchema.safeParse(parsedBody.data);
     if (!validationResult.success) {
       return NextResponse.json(
-        { error: "Validation failed", errors: validationResult.error.issues },
+        { error: 'Validation failed', errors: validationResult.error.issues },
         { status: 400 }
       );
     }
 
+    await dbConnect();
     const { id, url: reqUrl } = validationResult.data;
 
     let webServer;
     if (id) {
       webServer = await WebServer.findById(id);
+    } else if (session?.user?.email) {
+      webServer = await WebServer.findOne({ url: reqUrl, ownerEmail: session.user.email });
     } else {
       webServer = await WebServer.findOne({ url: reqUrl });
     }
@@ -34,29 +51,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Web server not found' }, { status: 404 });
     }
 
-    const targetUrl = webServer.url;
-    console.log(`Pinging ${targetUrl} via gRPC Worker...`);
-    
-    const grpcResult: any = await new Promise((resolve, reject) => {
-      grpcClient.CheckTarget({ url: targetUrl }, (err: any, response: any) => {
-        if (err) return reject(err);
-        resolve(response);
-      });
-    });
+    if (!isInternalAuthorized && webServer.ownerEmail !== session?.user?.email) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
+    const targetUrl = webServer.url;
+    const urlCheck = await validateAndResolveUrl(targetUrl, { allowHttp: true });
+    if (!urlCheck.valid) {
+      return NextResponse.json({ error: urlCheck.reason }, { status: 400 });
+    }
+
+    const grpcResult = await checkTargetViaGrpc(targetUrl, 15000);
     const latency = grpcResult.latency_ms;
     const status = grpcResult.status;
     const reason = grpcResult.reason;
-
-    console.log(`Ping result for ${targetUrl}: status=${status}, latency=${latency}ms, reason=${reason}`);
+    const nowIso = new Date().toISOString();
 
     const redisKey = `monitor:stats:${webServer._id}`;
-    await redis.hset(redisKey, {
+    try {
+      await redis.hset(redisKey, {
         status,
-        latency,
+        latency: String(latency),
         reason,
-        lastChecked: new Date().toISOString()
-    });
+        lastChecked: nowIso,
+      });
+      await redis.expire(redisKey, 3600);
+    } catch (redisErr) {
+      console.warn('Redis hset failed in ping:', redisErr);
+    }
 
     const metricPayload = {
       id: webServer._id.toString(),
@@ -64,24 +86,32 @@ export async function POST(req: Request) {
       status,
       latency,
       reason,
-      lastChecked: new Date().toISOString(),
+      lastChecked: nowIso,
     };
 
     try {
-      await redis.publish("system_metrics", JSON.stringify(metricPayload));
+      await redis.publish('system_metrics', JSON.stringify(metricPayload));
     } catch (publishError) {
-      console.error("Failed to publish system_metrics update:", publishError);
+      console.error('Failed to publish system_metrics update:', publishError);
     }
 
-    // 2. Prepare response
-    const responseData = webServer.toObject();
-    responseData.status = status;
-    responseData.latency = latency;
-    responseData.reason = reason;
-
-    return NextResponse.json({ message: 'Ping successful via gRPC', data: responseData }, { status: 200 });
-  } catch (error: any) {
+    return NextResponse.json(
+      {
+        message: 'Ping successful via gRPC',
+        data: {
+          _id: webServer._id,
+          name: webServer.name,
+          url: webServer.url,
+          status,
+          latency,
+          reason,
+          lastChecked: nowIso,
+        },
+      },
+      { status: 200 }
+    );
+  } catch (error) {
     console.error('Ping API Error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

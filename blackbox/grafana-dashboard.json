@@ -51,7 +51,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "blackbox_probe_success{job=\"blackbox\"}",
+          "expr": "blackbox_probe_success{job=~\"blackbox.*\"}",
           "legendFormat": "{{target}}",
           "refId": "A"
         }
@@ -80,7 +80,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "blackbox_probe_duration_seconds{job=\"blackbox\"}",
+          "expr": "blackbox_probe_duration_seconds{job=~\"blackbox.*\"}",
           "legendFormat": "{{target}} ({{module}})",
           "refId": "A"
         }
@@ -97,9 +97,9 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "red", "value": null},
+              {"color": "green", "value": null},
               {"color": "yellow", "value": 300},
-              {"color": "green", "value": 400}
+              {"color": "red", "value": 400}
             ]
           },
           "unit": "short"
@@ -119,7 +119,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "blackbox_probe_http_status_code{job=\"blackbox\"}",
+          "expr": "blackbox_probe_http_status_code{job=~\"blackbox.*\"}",
           "legendFormat": "{{target}}",
           "refId": "A"
         }
@@ -139,7 +139,7 @@
         },
         "overrides": []
       },
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
       "id": 4,
       "options": {
         "legend": {"calcs": ["mean", "min"], "displayMode": "table", "placement": "bottom"},
@@ -148,7 +148,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "sum by (target) (rate(blackbox_probe_success{job=\"blackbook\"}[5m])) / sum by (target) (rate(blackbox_probe_success{job=\"blackbox\"}[5m]) + rate(blackbox_probe_failed{job=\"blackbox\"}[5m])) * 100",
+          "expr": "avg by (target) (avg_over_time(blackbox_probe_success{job=~\"blackbox.*\"}[5m])) * 100",
           "legendFormat": "{{target}}",
           "refId": "A"
         }
@@ -174,7 +174,7 @@
         },
         "overrides": []
       },
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
       "id": 5,
       "options": {
         "showHeader": true,
@@ -183,7 +183,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "blackbox_probe_success{job=\"blackbox\"}",
+          "expr": "blackbox_probe_success{job=~\"blackbox.*\"}",
           "format": "table",
           "instant": true,
           "legendFormat": "{{target}}",
@@ -205,7 +205,7 @@
         },
         "overrides": []
       },
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 12},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
       "id": 6,
       "options": {
         "legend": {"calcs": ["mean", "max", "min"], "displayMode": "table", "placement": "bottom"},
@@ -214,7 +214,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "blackbox_probe_duration_seconds{job=\"blackbox\"}",
+          "expr": "blackbox_probe_duration_seconds{job=~\"blackbox.*\"}",
           "legendFormat": "{{target}} - {{module}}",
           "refId": "A"
         }

@@ -1,11 +1,9 @@
-# Grafana Cloud Alerting Rules for Blackbox Monitoring
-# Import these rules in Grafana Cloud Alerting or add to your Prometheus rule_files
+# Grafana Cloud Alerting & Recording Rules for Blackbox Monitoring
 
 groups:
   - name: driftseeker-blackbox-critical
     interval: 30s
     rules:
-      # Service completely down
       - alert: BlackboxServiceDown
         expr: blackbox_probe_success{job=~"blackbox.*"} == 0
         for: 2m
@@ -15,30 +13,22 @@ groups:
         annotations:
           summary: "Service {{ $labels.target }} is DOWN"
           description: |
-            The {{ $labels.target }} service ({{ $labels.url }}) has been down for 2 minutes.
+            The {{ $labels.target }} service has been down for 2 minutes.
             Module: {{ $labels.module }}
-            Last check: {{ $value | humanizeDuration }}
-          runbook_url: "https://github.com/your-org/drift_seek/blob/main/docs/runbooks/service-down.md"
 
-      # Multiple services down (possible infrastructure issue)
       - alert: BlackboxMultipleServicesDown
-        expr: |
-          count by (job) (blackbox_probe_success{job=~"blackbox.*"} == 0) > 1
+        expr: count by (job) (blackbox_probe_success{job=~"blackbox.*"} == 0) > 1
         for: 1m
         labels:
           severity: critical
           team: platform
         annotations:
           summary: "Multiple services down - possible infrastructure issue"
-          description: |
-            {{ $value }} services are simultaneously down.
-            This may indicate a network, DNS, or infrastructure problem.
-          runbook_url: "https://github.com/your-org/drift_seek/blob/main/docs/runbooks/infrastructure-issue.md"
+          description: "{{ $value }} services are simultaneously down."
 
   - name: driftseeker-blackbox-warning
     interval: 60s
     rules:
-      # High latency
       - alert: BlackboxHighLatency
         expr: blackbox_probe_duration_seconds{job=~"blackbox.*"} > 5
         for: 5m
@@ -47,18 +37,14 @@ groups:
           team: platform
         annotations:
           summary: "High latency for {{ $labels.target }}"
-          description: |
-            Probe latency for {{ $labels.target }} is {{ $value | humanizeDuration }} (threshold: 5s).
-            Module: {{ $labels.module }}
-          runbook_url: "https://github.com/your-org/drift_seek/blob/main/docs/runbooks/high-latency.md"
+          description: "Probe latency for {{ $labels.target }} is {{ $value | humanizeDuration }} (threshold: 5s)."
 
-      # Degraded latency (trending up)
       - alert: BlackboxLatencyIncreasing
         expr: |
           (
             avg_over_time(blackbox_probe_duration_seconds{job=~"blackbox.*"}[10m])
             /
-            avg_over_time(blackbox_probe_duration_seconds{job=~"blackbox.*"}[1h])
+            clamp_min(avg_over_time(blackbox_probe_duration_seconds{job=~"blackbox.*"}[1h]), 0.001)
           ) > 2
         for: 10m
         labels:
@@ -66,115 +52,65 @@ groups:
           team: platform
         annotations:
           summary: "Latency increasing for {{ $labels.target }}"
-          description: |
-            Latency has doubled compared to the 1-hour average.
-            Current 10m avg: {{ $value | humanizeDuration }}
+          description: "Latency has doubled compared to the 1-hour average."
 
-      # HTTP error status codes
       - alert: BlackboxHTTPErrors
-        expr: |
-          blackbox_probe_http_status_code{job=~"blackbox.*"} >= 400
+        expr: blackbox_probe_http_status_code{job=~"blackbox.*"} >= 400
         for: 3m
         labels:
           severity: warning
           team: platform
         annotations:
           summary: "HTTP errors for {{ $labels.target }}"
-          description: |
-            {{ $labels.target }} returning HTTP {{ $value }}.
-            Module: {{ $labels.module }}
+          description: "{{ $labels.target }} returning HTTP {{ $value }}."
 
-      # SSL certificate expiring soon (if using SSL probes)
       - alert: BlackboxSSLCertExpiring
-        expr: |
-          blackbox_ssl_earliest_cert_expiry{job=~"blackbox.*"} - time() < 86400 * 14
+        expr: probe_ssl_earliest_cert_expiry{job=~"blackbox.*"} - time() < 86400 * 14
         for: 1h
         labels:
           severity: warning
           team: security
         annotations:
           summary: "SSL certificate expiring soon for {{ $labels.target }}"
-          description: |
-            SSL certificate for {{ $labels.target }} expires in {{ ($value / 86400) | humanizeDuration }} days.
+          description: "SSL certificate expires in less than 14 days."
 
   - name: driftseeker-blackbox-info
     interval: 300s
     rules:
-      # Success rate dropping
       - alert: BlackboxSuccessRateLow
-        expr: |
-          (
-            sum by (target) (rate(blackbox_probe_success{job=~"blackbox.*"}[5m]))
-            /
-            sum by (target) (rate(blackbox_probe_success{job=~"blackbox.*"}[5m]) + rate(blackbox_probe_failed{job=~"blackbox.*"}[5m]))
-          ) < 0.95
+        expr: avg_over_time(blackbox_probe_success{job=~"blackbox.*"}[5m]) < 0.95
         for: 10m
         labels:
           severity: info
           team: platform
         annotations:
           summary: "Success rate below 95% for {{ $labels.target }}"
-          description: |
-            Success rate for {{ $labels.target }} is {{ $value | humanizePercentage }} over the last 5 minutes.
+          description: "Success rate for {{ $labels.target }} is {{ $value | humanizePercentage }} over the last 5 minutes."
 
-      # Probe taking too long (timeout risk)
       - alert: BlackboxProbeTimeoutRisk
-        expr: |
-          blackbox_probe_duration_seconds{job=~"blackbox.*"} > 8
+        expr: blackbox_probe_duration_seconds{job=~"blackbox.*"} > 8
         for: 2m
         labels:
           severity: info
           team: platform
         annotations:
           summary: "Probe timeout risk for {{ $labels.target }}"
-          description: |
-            Probe duration ({{ $value | humanizeDuration }}) approaching 10s timeout.
-            Consider increasing timeout or investigating performance.
+          description: "Probe duration ({{ $value | humanizeDuration }}) approaching 10s timeout."
 
-      # New target added (informational)
-      - alert: BlackboxNewTargetDetected
-        expr: |
-          count by (target) (blackbox_probe_success{job=~"blackbox.*"}) 
-          > 
-          count by (target) (blackbox_probe_success{job=~"blackbox.*"} offset 24h)
-        for: 5m
-        labels:
-          severity: info
-          team: platform
-        annotations:
-          summary: "New monitoring target detected: {{ $labels.target }}"
-          description: |
-            A new target {{ $labels.target }} has started reporting metrics.
-            Verify this is expected.
-
-# Recording rules for common queries (improves dashboard performance)
-groups:
   - name: driftseeker-blackbox-recording
     interval: 60s
     rules:
-      # Pre-compute success rate per target
       - record: blackbox:success_rate:5m
-        expr: |
-          sum by (target) (rate(blackbox_probe_success{job=~"blackbox.*"}[5m]))
-          /
-          sum by (target) (rate(blackbox_probe_success{job=~"blackbox.*"}[5m]) + rate(blackbox_probe_failed{job=~"blackbox.*"}[5m]))
+        expr: avg by (target) (avg_over_time(blackbox_probe_success{job=~"blackbox.*"}[5m]))
 
-      # Pre-compute average latency per target
       - record: blackbox:avg_latency:5m
-        expr: |
-          avg by (target) (rate(blackbox_probe_duration_seconds_sum{job=~"blackbox.*"}[5m]) / rate(blackbox_probe_duration_seconds_count{job=~"blackbox.*"}[5m]))
+        expr: avg by (target) (avg_over_time(blackbox_probe_duration_seconds{job=~"blackbox.*"}[5m]))
 
-      # Pre-compute p95 latency per target
       - record: blackbox:p95_latency:5m
-        expr: |
-          histogram_quantile(0.95, sum by (target, le) (rate(blackbox_probe_duration_seconds_bucket{job=~"blackbox.*"}[5m])))
+        expr: quantile by (target) (0.95, blackbox_probe_duration_seconds{job=~"blackbox.*"})
 
-      # Count of active targets
       - record: blackbox:active_targets
-        expr: |
-          count by (job) (blackbox_probe_success{job=~"blackbox.*"})
+        expr: count by (job) (blackbox_probe_success{job=~"blackbox.*"})
 
-      # Count of down targets
       - record: blackbox:down_targets
-        expr: |
-          count by (job) (blackbox_probe_success{job=~"blackbox.*"} == 0)
+        expr: count by (job) (blackbox_probe_success{job=~"blackbox.*"} == 0)

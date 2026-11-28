@@ -1,58 +1,165 @@
-import express from "express";
-import { createServer } from "http";
-import { Server } from "socket.io";
-import * as pty from "node-pty";
-import dotenv from "dotenv";
+import express from 'express';
+import cors from 'cors';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import * as pty from 'node-pty';
+import dotenv from 'dotenv';
 import path from 'path';
-import { execSync } from "child_process";
-import { exec } from "child_process";
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { createHash, timingSafeEqual } from 'crypto';
+import { execFile, execSync } from 'child_process';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 
 dotenv.config();
 
-// gRPC Setup
-const PROTO_PATH = path.resolve(__dirname, '../protos/execution.proto');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const SAFE_GITHUB_URL_REGEX =
+  /^https:\/\/github\.com\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+?)(?:\.git)?$/;
+const SAFE_USERNAME_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
+
+function safeTimingEqual(a: string, b: string): boolean {
+  const hashA = createHash('sha256').update(a).digest();
+  const hashB = createHash('sha256').update(b).digest();
+  return timingSafeEqual(hashA, hashB);
+}
+
+function isValidGithubRepoUrl(raw: unknown): raw is string {
+  if (typeof raw !== 'string') return false;
+  const match = raw.trim().match(SAFE_GITHUB_URL_REGEX);
+  if (!match) return false;
+  const [, owner, repo] = match;
+  return owner !== '.' && owner !== '..' && repo !== '.' && repo !== '..';
+}
+
+function resolveProtoPath(): string {
+  const candidates = [
+    path.resolve(__dirname, '../protos/execution.proto'),
+    path.resolve(__dirname, './protos/execution.proto'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return candidates[0];
+}
+
+const PROTO_PATH = resolveProtoPath();
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
-  keepCase: true, longs: String, enums: String, defaults: true, oneofs: true
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true,
 });
-const protoDescriptor = grpc.loadPackageDefinition(packageDefinition) as any;
+interface ExecutionDescriptor {
+  driftseeker: {
+    execution: {
+      SandboxManager: { service: grpc.ServiceDefinition };
+    };
+  };
+}
+
+const protoDescriptor = grpc.loadPackageDefinition(
+  packageDefinition
+) as unknown as ExecutionDescriptor;
 const executionProto = protoDescriptor.driftseeker.execution;
+
+function buildStressDockerArgs(githubUrl: string): string[] {
+  const innerScript =
+    'apk add --no-cache git > /dev/null 2>&1 && ' +
+    'npm install -g autocannon > /dev/null 2>&1 && ' +
+    'git clone --depth 1 "$1" /temp_app > /dev/null 2>&1 && ' +
+    'cd /temp_app && ' +
+    'npm install --legacy-peer-deps > /dev/null 2>&1 && ' +
+    'npm run build --if-present > /dev/null 2>&1 && ' +
+    '(npm start > /dev/null 2>&1 &) && ' +
+    'sleep 15 && ' +
+    'autocannon -c 50 -a 2000 -j http://localhost:3000';
+
+  return [
+    'run',
+    '--rm',
+    '--memory=256m',
+    '--cpus=0.5',
+    'node:alpine',
+    'sh',
+    '-c',
+    innerScript,
+    '_',
+    githubUrl,
+  ];
+}
 
 function startGrpcServer() {
   const server = new grpc.Server();
-  
+
   server.addService(executionProto.SandboxManager.service, {
-    RunStressTest: (call: any) => {
-      const { github_url } = call.request;
+    RunStressTest: (call: grpc.ServerWritableStream<{ github_url?: string }, { message: string }>) => {
+      const expectedToken = process.env.GRPC_AUTH_TOKEN;
+      if (expectedToken) {
+        const incoming = call.metadata?.get('x-grpc-auth-token')?.[0];
+        if (typeof incoming !== 'string' || !safeTimingEqual(incoming, expectedToken)) {
+          call.emit('error', { code: grpc.status.UNAUTHENTICATED, details: 'Unauthorized' });
+          return;
+        }
+      }
+
+      const { github_url } = call.request || {};
+      if (!isValidGithubRepoUrl(github_url)) {
+        call.emit('error', {
+          code: grpc.status.INVALID_ARGUMENT,
+          details: 'Invalid GitHub repository URL',
+        });
+        return;
+      }
+
       console.log(`[gRPC] RunStressTest requested for ${github_url}`);
-      
       call.write({ message: `Starting pipeline for ${github_url}...` });
-      
-      const command = `docker run --rm --memory="256m" --cpus="0.5" node:alpine sh -c "apk add --no-cache git && npm install -g autocannon && git clone ${github_url} /temp_app && cd /temp_app && npm install --legacy-peer-deps && npm run build --if-present && (npm start &) && sleep 15 && autocannon -c 50 -a 2000 -j http://localhost:3000"`;
-      
-      const child = exec(command, { maxBuffer: 1024 * 1024 * 10 });
-      
+
+      const child = execFile('docker', buildStressDockerArgs(github_url.trim()), {
+        maxBuffer: 1024 * 1024 * 10,
+      });
+
+      call.on('cancelled', () => {
+        child.kill('SIGKILL');
+      });
+
       child.stdout?.on('data', (data) => {
-        // Stream stdout to the client
         const lines = data.toString().split('\n').filter(Boolean);
         lines.forEach((line: string) => call.write({ message: line }));
       });
-      
+
       child.stderr?.on('data', (data) => {
         const lines = data.toString().split('\n').filter(Boolean);
         lines.forEach((line: string) => call.write({ message: `[ERROR] ${line}` }));
       });
-      
+
       child.on('close', (code) => {
         call.write({ message: `Process exited with code ${code}` });
         call.end();
       });
-    }
+    },
   });
 
   const grpcPort = process.env.GRPC_PORT || '50052';
-  server.bindAsync(`0.0.0.0:${grpcPort}`, grpc.ServerCredentials.createInsecure(), (err, port) => {
+  let credentials = grpc.ServerCredentials.createInsecure();
+  if (
+    process.env.GRPC_USE_TLS === 'true' &&
+    process.env.GRPC_TLS_KEY &&
+    process.env.GRPC_TLS_CERT
+  ) {
+    credentials = grpc.ServerCredentials.createSsl(null, [
+      {
+        private_key: Buffer.from(process.env.GRPC_TLS_KEY, 'utf8'),
+        cert_chain: Buffer.from(process.env.GRPC_TLS_CERT, 'utf8'),
+      },
+    ]);
+  }
+
+  server.bindAsync(`0.0.0.0:${grpcPort}`, credentials, (err, port) => {
     if (err) {
       console.error(err);
       return;
@@ -61,108 +168,148 @@ function startGrpcServer() {
   });
 }
 
+const allowedOrigins = (process.env.CLIENT_ORIGINS || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 const app = express();
+app.use(
+  cors({
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true,
+  })
+);
+app.use(express.json());
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: [process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000"],
-    methods: ["GET", "POST"],
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
     credentials: true,
   },
 });
 
+if (process.env.TERMINAL_AUTH_TOKEN) {
+  const requiredToken = process.env.TERMINAL_AUTH_TOKEN;
+  io.use((socket, next) => {
+    const incoming = socket.handshake.auth?.token;
+    if (typeof incoming !== 'string' || !safeTimingEqual(incoming, requiredToken)) {
+      return next(new Error('Unauthorized'));
+    }
+    return next();
+  });
+}
+
 function startServer() {
   startGrpcServer();
 
-  const targetContainer = "alpine:latest";
-  
+  const targetContainer = 'alpine:latest';
   console.log(`Pre-pulling ${targetContainer} to ensure clean terminal starts...`);
   try {
     execSync(`docker pull ${targetContainer}`, { stdio: 'ignore' });
-    console.log("Docker image is cached and ready!");
+    console.log('Docker image is cached and ready!');
   } catch (err) {
-    console.error("Warning: Failed to pre-pull image. It will pull on first connection.", err);
+    console.error('Warning: Failed to pre-pull image. It will pull on first connection.', err);
   }
 
-  io.on("connection", (socket) => {
-    console.log("Secure Shell Session Started:", socket.id);
+  io.on('connection', (socket) => {
+    console.log('Secure Shell Session Started:', socket.id);
     let ptyProcess: pty.IPty | null = null;
-    const containerName = `drift_shell_${socket.id}`;
+    const safeSocketId = socket.id.replace(/[^a-zA-Z0-9_-]/g, '');
+    const containerName = `drift_shell_${safeSocketId}`;
 
     try {
-      const customUser = socket.handshake.auth.username || "drift_user";
-      const targetContainer = "alpine:latest";
-      const REPOS_BASE_DIR = '/home/ubuntu/drift_repos'; 
-      const repoName = "system_seek"; 
-      const hostRepoPath = path.join(REPOS_BASE_DIR, repoName);
-      const command = "docker";
+      const rawUser = String(socket.handshake.auth?.username || 'drift_user');
+      const customUser = SAFE_USERNAME_REGEX.test(rawUser) ? rawUser : 'drift_user';
+      const baseWorkspaceDir = process.env.DRIFT_WORKSPACES_DIR || '/tmp/drift_workspaces';
+      const userWorkspacePath = path.join(baseWorkspaceDir, customUser);
+      fs.mkdirSync(userWorkspacePath, { recursive: true });
 
-     const args = [
-  "run", "--rm", "-it", "--name", containerName, "--memory", "256m", "--cpus", "0.5",
-  "-v", `${hostRepoPath}:/projects`,
-  "-w", "/projects",
-  "-e", "TERM=xterm-256color",
-  "-e", "PROMPT_COMMAND=",  
-  targetContainer, 
-  "sh", 
-  "-c", 
-  "apk update && apk add --no-cache bash git openrc curl && sleep 2 && echo 'DRIFT_CLEAR_SCREEN' && echo 'PS1=\"\"' > ~/.bashrc && exec bash"
-];
-      console.log(`Secure Shell Session Started for: ${customUser}`);
-      ptyProcess = pty.spawn(command, args, {
-        name: "xterm-color",
+      const args = [
+        'run',
+        '--rm',
+        '-it',
+        '--name',
+        containerName,
+        '--memory',
+        '256m',
+        '--cpus',
+        '0.5',
+        '-v',
+        `${userWorkspacePath}:/projects`,
+        '-w',
+        '/projects',
+        '-e',
+        'TERM=xterm-256color',
+        '-e',
+        'PROMPT_COMMAND=printf "DRIFT_SERVER_PROMPT|%s> " "$PWD"',
+        targetContainer,
+        'sh',
+        '-c',
+        'apk update >/dev/null 2>&1 && apk add --no-cache bash git curl >/dev/null 2>&1 && echo "DRIFT_CLEAR_SCREEN" && echo "PS1=\\"\\"" > ~/.bashrc && exec bash',
+      ];
+
+      ptyProcess = pty.spawn('docker', args, {
+        name: 'xterm-color',
         cols: 80,
         rows: 30,
         cwd: process.cwd(),
         env: {
           ...process.env,
-          DRIFT_ENGINE_ACTIVE: "true",
+          DRIFT_ENGINE_ACTIVE: 'true',
         },
       });
     } catch (err) {
-      console.error("Failed to spawn shell:", err);
-      socket.emit("output", "\r\n[server] Failed to start shell.\r\n");
+      console.error('Failed to spawn shell:', err);
+      socket.emit('output', '\r\n[server] Failed to start shell.\r\n');
       socket.disconnect();
       return;
     }
 
     ptyProcess.onData((data) => {
-      socket.emit("output", data);
+      socket.emit('output', data);
     });
 
     ptyProcess.onExit(({ exitCode, signal }) => {
-      socket.emit(
-        "output",
-        `\r\n[server] Shell exited (code=${exitCode}, signal=${signal}).\r\n`,
-      );
+      socket.emit('output', `\r\n[server] Shell exited (code=${exitCode}, signal=${signal}).\r\n`);
+      socket.disconnect(true);
     });
 
-    socket.on("input", (data) => {
+    socket.on('input', (data) => {
+      if (typeof data !== 'string' || data.length > 4096) return;
       try {
         ptyProcess?.write(data);
       } catch (err) {
-        console.error("Failed to write to shell:", err);
+        console.error('Failed to write to shell:', err);
       }
     });
 
-    socket.on("error", (err) => {
-      console.error("Socket error:", err);
+    socket.on('resize', (dims: { cols?: unknown; rows?: unknown }) => {
+      const cols = Number(dims?.cols);
+      const rows = Number(dims?.rows);
+      if (Number.isInteger(cols) && Number.isInteger(rows) && cols > 0 && rows > 0 && cols <= 500 && rows <= 200) {
+        ptyProcess?.resize(cols, rows);
+      }
     });
 
-    socket.on("disconnect", () => {
-      console.log("Session Ended:", socket.id);
+    socket.on('error', (err) => {
+      console.error('Socket error:', err);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Session Ended:', socket.id);
       try {
         ptyProcess?.kill();
-        exec(`docker rm -f ${containerName}`, (error, stdout, stderr) => {
+        execFile('docker', ['rm', '-f', containerName], (error) => {
           if (error) {
-            console.log(`Container ${containerName} cleanup error (may have already exited): ${error.message}`);
-          } else {
-            console.log(`Successfully removed container ${containerName}`);
+            console.log(`Container ${containerName} cleanup note: ${error.message}`);
           }
         });
       } catch (err) {
-        console.error("Failed to kill shell process:", err);
+        console.error('Failed to kill shell process:', err);
       }
     });
   });
@@ -171,100 +318,123 @@ function startServer() {
   const portArg = argv.indexOf('--port');
   const hostArg = argv.indexOf('--hostname');
 
-  const port = portArg !== -1 && argv[portArg + 1] ? parseInt(argv[portArg + 1], 10) : (process.env.PORT ? parseInt(process.env.PORT, 10) : 3001);
+  const port =
+    portArg !== -1 && argv[portArg + 1]
+      ? parseInt(argv[portArg + 1], 10)
+      : process.env.PORT
+        ? parseInt(process.env.PORT, 10)
+        : 3001;
   const hostname = hostArg !== -1 && argv[hostArg + 1] ? argv[hostArg + 1] : '0.0.0.0';
 
   httpServer.listen(port, hostname, () => {
-    console.log(`Handyman Terminal running ....`);
+    console.log(`Handyman Terminal running on ${hostname}:${port}`);
   });
 }
 
 try {
   startServer();
 } catch (err) {
-  console.error("Error starting terminal server:", err);
+  console.error('Error starting terminal server:', err);
   process.exit(1);
 }
 
-process.on("uncaughtException", (err) => {
-  console.error("Uncaught exception:", err);
-});
-process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled rejection:", reason);
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+  process.exit(1);
 });
 
-app.get("/", (req, res) => {
-  res.send("Handyman Terminal Server is running.");
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
 });
 
-// --- CRITICAL FIX 1: Apply JSON parser globally ---
-app.use(express.json());
+app.get('/', (_req, res) => {
+  res.send('Handyman Terminal Server is running.');
+});
 
-app.post("/run-github-stress-test", (req, res) => {
-  
-  // --- CRITICAL FIX 2: Prevent the Node.js HTML Crash ---
-  if (!req.body) {
-    return res.status(400).json({ success: false, error: "Missing JSON body. This is usually caused by an HTTP -> HTTPS redirect dropping the payload." });
+app.get('/health', (_req, res) => {
+  res.status(200).json({ ok: true });
+});
+
+app.post('/run-github-stress-test', (req, res) => {
+  const expectedToken = (process.env.SEEK_API_TOKEN || '').trim();
+  if (!expectedToken) {
+    return res.status(500).json({ success: false, error: 'SEEK_API_TOKEN not configured' });
   }
 
-  const { githubUrl } = req.body;
-  if (!githubUrl || !githubUrl.startsWith("https://github.com/")) {
-    return res.status(400).json({ error: "Invalid GitHub URL" });
+  const incomingToken = String(req.headers['x-seek-api-token'] || '').trim();
+  if (!incomingToken || !safeTimingEqual(incomingToken, expectedToken)) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
 
-  // 1. Respond to Vercel IMMEDIATELY
-  res.json({ success: true, message: "Pipeline started in background" });
+  if (!req.body || typeof req.body !== 'object') {
+    return res.status(400).json({ success: false, error: 'Missing JSON body.' });
+  }
 
-  // 2. Run the heavy work in the background, SILENCING all logs except autocannon JSON
-  // 2. Run the heavy work in the background, SILENCING all logs except autocannon JSON
-  const command = `docker run --rm --memory="256m" --cpus="0.5" node:alpine sh -c "apk add --no-cache git > /dev/null 2>&1 && npm install -g autocannon > /dev/null 2>&1 && git clone ${githubUrl} /temp_app > /dev/null 2>&1 && cd /temp_app && npm install --legacy-peer-deps > /dev/null 2>&1 && npm run build --if-present > /dev/null 2>&1 && (npm start > /dev/null 2>&1 &) && sleep 15 && autocannon -c 50 -a 2000 -j http://localhost:3000"`;
+  const { githubUrl, branch = 'main' } = req.body as { githubUrl?: unknown; branch?: unknown };
+  if (!isValidGithubRepoUrl(githubUrl)) {
+    return res.status(400).json({ success: false, error: 'Invalid GitHub URL' });
+  }
 
-  exec(command, { maxBuffer: 1024 * 1024 * 10 }, async (error, stdout, stderr) => {
+  const safeBranch = typeof branch === 'string' && branch.trim() ? branch.trim() : 'main';
+  res.json({ success: true, message: 'Pipeline started in background' });
+
+  execFile('docker', buildStressDockerArgs(githubUrl.trim()), { maxBuffer: 1024 * 1024 * 10 }, async (error, stdout, stderr) => {
     if (error) {
-       console.error(`[STRESS ENGINE FATAL]`, stderr);
-       return;
+      console.error('[STRESS ENGINE FATAL]', stderr);
+      return;
     }
 
     try {
-      if (!stdout || stdout.trim() === '') {
-        throw new Error('autocannon returned empty output');
+      const startIdx = stdout ? stdout.indexOf('{') : -1;
+      if (startIdx === -1) {
+        throw new Error('autocannon did not emit JSON output');
       }
 
-      // Find the first occurrence of '{' to ensure we only parse the clean JSON object
-      const cleanStdout = stdout.substring(stdout.indexOf('{'));
-      const stats = JSON.parse(cleanStdout) as any;
-      
-      console.log(`[DEBUG - PROOF OF LIFE] Autocannon successfully tested ${githubUrl}. Total Requests: ${stats.requests.sent}, Avg Latency: ${stats.latency.average}ms`);
-      
-      const totalReqs = stats.requests.sent || stats.requests.total || 0;
-      const successReqs = stats['2xx'] || 0;
-      
-      const metrics = {
-        totalRequests: totalReqs,
-        successRate: totalReqs > 0 ? Number(((successReqs / totalReqs) * 100).toFixed(2)) : 0,
-        latencyAverage: stats.latency.average,
-        latency99th: stats.latency.p99,
-        requestsPerSecond: stats.requests.average,
+      const cleanStdout = stdout.substring(startIdx);
+      const stats = JSON.parse(cleanStdout) as {
+        requests?: { sent?: number; total?: number; average?: number };
+        latency?: { average?: number; p99?: number };
+        '2xx'?: number;
       };
 
-      const targetVercelUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "https://drift-seek.vercel.app";
-      
-      await fetch(`${targetVercelUrl}/api/pipelines/callback`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ githubUrl, metrics })
-      })
-      .then(res => {
-         if (!res.ok) console.error("[STRESS ENGINE] Vercel rejected the callback payload.", res.status);
-         else console.log(`[STRESS ENGINE] Results dispatched for ${githubUrl}. Data saved to MongoDB.`);
-      })
-      .catch(err => {
-         console.error("[STRESS ENGINE FATAL] Could not reach Vercel API:", err.message);
+      const totalReqs = Number(stats.requests?.sent || stats.requests?.total || 0);
+      const successReqs = Number(stats['2xx'] || 0);
+      const successRate = totalReqs > 0 ? Number(((successReqs / totalReqs) * 100).toFixed(2)) : 0;
+
+      const runMetrics = {
+        requestsPerSecond: Number(stats.requests?.average || 0),
+        latencyAverage: Number(stats.latency?.average || 0),
+        latency99th: Number(stats.latency?.p99 || 0),
+        successRate,
+      };
+
+      const targetVercelUrl = (
+        process.env.NEXT_PUBLIC_API_BASE_URL || 'https://drift-seek.vercel.app'
+      ).replace(/\/+$/, '');
+
+      const callbackRes = await fetch(`${targetVercelUrl}/api/abtest/results`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-seek-api-token': expectedToken,
+        },
+        body: JSON.stringify({
+          githubUrl: githubUrl.trim(),
+          testData: {
+            baselineBranch: safeBranch,
+            candidateBranch: safeBranch,
+            baselineMetrics: runMetrics,
+            candidateMetrics: runMetrics,
+            passed: successRate >= 99.9,
+          },
+        }),
       });
 
+      if (!callbackRes.ok) {
+        console.error('[STRESS ENGINE] Callback rejected:', callbackRes.status);
+      }
     } catch (parseError) {
-      console.error(`[STRESS ENGINE JSON PARSE ERROR]`, parseError);
-      console.error("RAW STDOUT:", stdout.substring(0, 200));
+      console.error('[STRESS ENGINE JSON PARSE ERROR]', parseError);
     }
   });
 });

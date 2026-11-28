@@ -3,7 +3,7 @@ services:
     image: mongo:7
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongo-data:/data/db
     healthcheck:
@@ -11,13 +11,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - driftseeker-network
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -25,11 +27,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - driftseeker-network
 
   terminal-server:
     build:
-      context: ./terminal-server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: terminal-server/Dockerfile
     restart: unless-stopped
     ports:
       - "3001:3001"
@@ -37,7 +41,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      NEXT_PUBLIC_API_BASE_URL: https://expert-train-6p67vjvvjrpcr6gw-3000.app.github.dev
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000}
+      CLIENT_ORIGINS: ${CLIENT_ORIGINS:-http://localhost:3000}
+      SEEK_API_TOKEN: ${SEEK_API_TOKEN:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
@@ -45,6 +51,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - driftseeker-network
 
   grpc-worker:
     build:
@@ -56,6 +64,27 @@ services:
     environment:
       NODE_ENV: production
       PORT: 50051
+    networks:
+      - driftseeker-network
+
+  realtime-server:
+    image: node:20-alpine
+    working_dir: /app/realtime-server
+    command: ["sh", "-c", "npm install --omit=dev && node server.js"]
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./realtime-server:/app/realtime-server
+    environment:
+      PORT: 3002
+      REDIS_URL: redis://redis:6379
+      CLIENT_ORIGINS: ${CLIENT_ORIGINS:-http://localhost:3000}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - driftseeker-network
 
   app:
     build:
@@ -67,12 +96,13 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      NEXTAUTH_URL: https://expert-train-6p67vjvvjrpcr6gw-3000.app.github.dev/api/auth/callback/github
-      NEXT_PUBLIC_API_BASE_URL: https://expert-train-6p67vjvvjrpcr6gw-3000.app.github.dev
-      NEXT_PUBLIC_SERVER_BASE_URL: https://expert-train-6p67vjvvjrpcr6gw-3001.app.github.dev
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000}
+      NEXT_PUBLIC_SERVER_BASE_URL: ${NEXT_PUBLIC_SERVER_BASE_URL:-http://localhost:3001}
+      NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-http://localhost:3002}
       MONGODB_URI: mongodb://mongo:27017/system_seek
       REDIS_URL: redis://redis:6379
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET must be set}
       GITHUB_ID: ${GITHUB_ID:-}
       GITHUB_SECRET: ${GITHUB_SECRET:-}
       GRPC_WORKER_URL: grpc-worker:50051
@@ -83,7 +113,13 @@ services:
         condition: service_healthy
       terminal-server:
         condition: service_started
+    networks:
+      - driftseeker-network
 
 volumes:
   mongo-data:
   redis-data:
+
+networks:
+  driftseeker-network:
+    name: driftseeker-network

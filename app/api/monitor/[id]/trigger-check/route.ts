@@ -1,147 +1,90 @@
-import { NextRequest, NextResponse } from "next/server";
-import dbConnect from "@/lib/db_connect";
-import WebServer from "@/lib/models/WebServer";
-import SurgeConfig from "@/lib/models/SurgeConfig";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import redis from "@/lib/redis";
-import { sendTelegramAlert } from "@/lib/mailer";
+import { NextRequest, NextResponse } from 'next/server';
+import dbConnect from '@/lib/db_connect';
+import WebServer from '@/lib/models/WebServer';
+import SurgeConfig from '@/lib/models/SurgeConfig';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import redis from '@/lib/redis';
+import { sendTelegramAlert } from '@/lib/mailer';
+import { objectIdSchema } from '@/lib/validation/schemas';
+import { safeFetchWithRedirects } from '@/lib/security/urlValidator';
 
 export const dynamic = 'force-dynamic';
 
-// URL Validation to prevent SSRF (same as watchtower)
-const ALLOWED_PROTOCOLS = ['https:'];
-const BLOCKED_HOSTNAMES = new Set([
-  'localhost',
-  '127.0.0.1',
-  '0.0.0.0',
-  '::1',
-  '169.254.169.254',
-  'metadata.google.internal',
-  'metadata.azure.com',
-]);
-
-const BLOCKED_CIDRS = [
-  '10.0.0.0/8',
-  '172.16.0.0/12',
-  '192.168.0.0/16',
-  '127.0.0.0/8',
-  '169.254.0.0/16',
-  '::1/128',
-  'fe80::/10',
-  'fc00::/7',
-];
-
-function ipToLong(ip: string): number {
-  const parts = ip.split('.').map(Number);
-  return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
-}
-
-function cidrContains(cidr: string, ip: string): boolean {
-  const [rangeIp, bits] = cidr.split('/');
-  const mask = ~((1 << (32 - parseInt(bits))) - 1);
-  return (ipToLong(ip) & mask) === (ipToLong(rangeIp) & mask);
-}
-
-function isPrivateIp(hostname: string): boolean {
-  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-  if (!ipv4Regex.test(hostname)) return false;
-  
-  const parts = hostname.split('.').map(Number);
-  if (parts.some(p => p > 255)) return false;
-  
-  return BLOCKED_CIDRS.some(cidr => cidrContains(cidr, hostname));
-}
-
-function validateUrl(url: string): { valid: boolean; reason: string } {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return { valid: false, reason: 'Invalid URL format' };
-  }
-
-  if (!ALLOWED_PROTOCOLS.includes(parsed.protocol)) {
-    return { valid: false, reason: `Protocol ${parsed.protocol} not allowed` };
-  }
-
-  const hostname = parsed.hostname.toLowerCase();
-  if (BLOCKED_HOSTNAMES.has(hostname)) {
-    return { valid: false, reason: `Host ${hostname} is blocked` };
-  }
-
-  if (isPrivateIp(hostname)) {
-    return { valid: false, reason: `Private IP ${hostname} is blocked` };
-  }
-
-  if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
-    return { valid: false, reason: 'Localhost access blocked' };
-  }
-
-  return { valid: true, reason: '' };
-}
-
-async function checkTarget(url: string): Promise<{ latency: number; status: "up" | "down"; reason: string; headers: Record<string, string> }> {
-  const validation = validateUrl(url);
-  if (!validation.valid) {
-    return { latency: 0, status: "down", reason: validation.reason, headers: {} };
-  }
-
+async function checkTarget(url: string): Promise<{
+  latency: number;
+  status: 'up' | 'down';
+  reason: string;
+  headers: Record<string, string>;
+}> {
   const start = performance.now();
-  let status: "up" | "down" = "down";
-  let reason = "";
-  let headers: Record<string, string> = {};
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  let status: 'up' | 'down' = 'down';
+  let reason = '';
+  const headers: Record<string, string> = {};
 
   try {
-    const res = await fetch(url, { 
-      method: "HEAD", 
-      signal: controller.signal,
-      redirect: 'manual',
+    const { response } = await safeFetchWithRedirects(url, {
+      method: 'HEAD',
+      timeoutMs: 10000,
+      allowHttp: true,
+      fallbackToGetOn405: true,
     });
-    clearTimeout(timeoutId);
-    
-    res.headers.forEach((value, key) => {
+    await response.body?.cancel().catch(() => {});
+
+    response.headers.forEach((value, key) => {
       headers[key.toLowerCase()] = value;
     });
-    
-    if (res.ok) status = "up";
-    else reason = `HTTP ${res.status}`;
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    reason = error.name === "AbortError" ? "Timeout" : "Network Failure";
+
+    if (response.ok) {
+      status = 'up';
+    } else {
+      reason = `HTTP ${response.status}`;
+    }
+  } catch (error) {
+    reason =
+      error instanceof Error && error.name === 'AbortError'
+        ? 'Timeout'
+        : error instanceof Error
+          ? error.message
+          : 'Network Failure';
   }
+
   return { latency: Math.round(performance.now() - start), status, reason, headers };
 }
 
 export async function POST(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || !session.user || !session.user.email) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
-    await dbConnect();
-
-    const server = await WebServer.findOne({ _id: id, ownerEmail: session.user.email });
-    if (!server) {
-      return NextResponse.json({ message: "Monitor not found" }, { status: 404 });
+    const idCheck = objectIdSchema.safeParse(id);
+    if (!idCheck.success) {
+      return NextResponse.json({ message: 'Invalid monitor ID' }, { status: 400 });
     }
 
-    // Check surge config for telegram settings
-    const surgeConfig = await SurgeConfig.findOne({ monitorId: id });
+    await dbConnect();
+
+    const server = await WebServer.findOne({ _id: idCheck.data, ownerEmail: session.user.email });
+    if (!server) {
+      return NextResponse.json({ message: 'Monitor not found' }, { status: 404 });
+    }
+
+    const surgeConfig = await SurgeConfig.findOne({
+      monitorId: idCheck.data,
+      ownerEmail: session.user.email,
+    });
     const telegramEnabled = surgeConfig?.telegramEnabled ?? false;
 
     const { latency, status, reason, headers } = await checkTarget(server.url);
     const now = new Date().toISOString();
 
-    // Update Redis cache
-    const redisKey = `monitor:stats:${id}`;
+    const redisKey = `monitor:stats:${idCheck.data}`;
     try {
       await redis.hset(redisKey, {
         status,
@@ -150,14 +93,13 @@ export async function POST(
         lastChecked: now,
         headers: JSON.stringify(headers),
       });
-      await redis.expire(redisKey, 3600); // 1 hour TTL
+      await redis.expire(redisKey, 3600);
     } catch (redisErr) {
-      console.warn("Redis update failed:", redisErr);
+      console.warn('Redis update failed:', redisErr);
     }
 
-    // Publish to socket for real-time UI update
     const metricPayload = {
-      id,
+      id: idCheck.data,
       url: server.url,
       status,
       latency,
@@ -166,29 +108,23 @@ export async function POST(
     };
 
     try {
-      await redis.publish("system_metrics", JSON.stringify(metricPayload));
+      await redis.publish('system_metrics', JSON.stringify(metricPayload));
     } catch (publishErr) {
-      console.warn("Redis publish failed:", publishErr);
+      console.warn('Redis publish failed:', publishErr);
     }
 
-    // Send Telegram alert if configured
     if (telegramEnabled && process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
-      const emoji = status === "up" ? "✅" : "🔴";
-      const message = `${emoji} *Manual Check: ${server.name}*\n` +
-        `URL: ${server.url}\n` +
-        `Status: ${status.toUpperCase()}\n` +
-        `Latency: ${latency}ms\n` +
-        `Reason: ${reason || "OK"}\n` +
-        `Time: ${now}`;
-      
       try {
         await sendTelegramAlert({
           url: server.url,
-          reason: message,
+          reason: reason || (status === 'up' ? 'Target responded normally' : 'Service unreachable'),
           ownerEmail: server.ownerEmail,
+          status,
+          latencyMs: latency,
+          title: `<b>Manual Check: ${server.name}</b>`,
         });
       } catch (telegramErr) {
-        console.warn("Telegram alert failed:", telegramErr);
+        console.warn('Telegram alert failed:', telegramErr);
       }
     }
 
@@ -204,8 +140,8 @@ export async function POST(
         lastChecked: now,
       },
     });
-  } catch (err: any) {
-    console.error("Trigger check error:", err);
-    return NextResponse.json({ message: "Internal server error", error: err.message }, { status: 500 });
+  } catch (err) {
+    console.error('Trigger check error:', err);
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }

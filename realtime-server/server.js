@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { createServer } = require("node:http");
 const { Server } = require("socket.io");
 const Redis = require("ioredis");
@@ -5,6 +6,7 @@ const Redis = require("ioredis");
 const PORT = Number(process.env.PORT || 3002);
 const CHANNEL = process.env.METRICS_CHANNEL || "system_metrics";
 const REDIS_URL = process.env.REDIS_URL;
+const REALTIME_AUTH_TOKEN = process.env.REALTIME_AUTH_TOKEN || "";
 const CLIENT_ORIGINS = (process.env.CLIENT_ORIGINS || "")
   .split(",")
   .map((entry) => entry.trim())
@@ -30,19 +32,33 @@ const httpServer = createServer(requestHandler);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: CLIENT_ORIGINS.length > 0 ? CLIENT_ORIGINS : true,
+    origin: CLIENT_ORIGINS.length > 0 ? CLIENT_ORIGINS : ["http://localhost:3000"],
     methods: ["GET", "POST"],
     credentials: true,
   },
 });
 
+if (REALTIME_AUTH_TOKEN) {
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token;
+    if (token !== REALTIME_AUTH_TOKEN) {
+      return next(new Error("Unauthorized"));
+    }
+    return next();
+  });
+}
+
 const subscriber = new Redis(REDIS_URL, {
-  maxRetriesPerRequest: 3,
+  maxRetriesPerRequest: null,
 });
 
 function parseMetric(message) {
   try {
-    return JSON.parse(message);
+    const parsed = JSON.parse(message);
+    if (!parsed || !parsed.id || !Number.isFinite(Number(parsed.latency ?? 0))) {
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -54,7 +70,7 @@ subscriber.on("message", (channel, message) => {
   }
 
   const payload = parseMetric(message);
-  if (!payload || !payload.id) {
+  if (!payload) {
     return;
   }
 
@@ -86,7 +102,7 @@ start().catch((error) => {
 async function shutdown(signal) {
   console.log(`Received ${signal}, shutting down realtime server...`);
   try {
-    io.close();
+    await new Promise((resolve) => io.close(() => resolve()));
     await subscriber.quit();
   } catch (error) {
     console.error("Error during shutdown:", error);

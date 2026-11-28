@@ -31,5 +31,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "terminal-server", ".next"]
+  "exclude": ["node_modules", "terminal-server", "grpc-worker", "realtime-server", "blackbox", ".next"]
 }

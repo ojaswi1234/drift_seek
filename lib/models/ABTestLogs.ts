@@ -1,8 +1,10 @@
 import mongoose from 'mongoose';
 
 const ABTestLogsSchema = new mongoose.Schema({
-    githubUrl: { type: String, required: true },
-    abTests: [{
+  githubUrl: { type: String, required: true, unique: true },
+  ownerEmail: { type: String, index: true },
+  abTests: [
+    {
       testedAt: { type: Date, default: Date.now },
       baselineBranch: { type: String },
       candidateBranch: { type: String },
@@ -10,16 +12,17 @@ const ABTestLogsSchema = new mongoose.Schema({
         requestsPerSecond: { type: Number },
         latencyAverage: { type: Number },
         latency99th: { type: Number },
-        successRate: { type: Number }
+        successRate: { type: Number },
       },
       candidateMetrics: {
         requestsPerSecond: { type: Number },
         latencyAverage: { type: Number },
         latency99th: { type: Number },
-        successRate: { type: Number }
+        successRate: { type: Number },
       },
-      passed: { type: Boolean }
-    }]
+      passed: { type: Boolean },
+    },
+  ],
 });
 
 const ABTestLogs = mongoose.models.ABTestLogs || mongoose.model('ABTestLogs', ABTestLogsSchema);
