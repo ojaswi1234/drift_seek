@@ -1,4 +1,4 @@
-import React from 'react';
+coimport React from 'react';
 import { Activity, Globe, Clock, Trash2, PlayCircle, AlertTriangle, Settings, Zap, ExternalLink } from 'lucide-react';
 
 interface MonitorCardProps {
