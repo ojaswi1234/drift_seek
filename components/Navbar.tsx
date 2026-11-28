@@ -1,5 +1,5 @@
 "use client";
-import { Workflow, LogOut, User, Activity, Terminal, LayoutDashboard, Bot } from 'lucide-react';
+import { Workflow, LogOut, User, Activity, Terminal, LayoutDashboard, Bot, Search } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
@@ -23,6 +23,7 @@ const Navbar = () => {
   const navItems = [
     { id: 'dashboard', icon: <LayoutDashboard size={24} strokeWidth={1.5} />, label: 'DASHBOARD', url: '/dashboard' },
     { id: 'monitor', icon: <Activity size={24} strokeWidth={1.5} />, label: 'UPTIME_MONITOR', url: '/monitors' },
+    { id: 'drift', icon: <Search size={24} strokeWidth={1.5} />, label: 'DRIFT_ENGINE', url: '/drift' },
     { id: 'console', icon: <Terminal size={24} strokeWidth={1.5} />, label: 'WEB_SHELL', url: '/console' },
     { id: 'pipelines', icon: <Bot size={24} strokeWidth={1.5} />, label: 'A/B_PIPELINES', url: '/pipelines' },
   ];

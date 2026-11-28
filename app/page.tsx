@@ -28,9 +28,9 @@ export default function Home() {
     {
       icon: <Search size={28} strokeWidth={1.5} />,
       title: "Drift Detection Engine",
-      href: "/dashboard",
+      href: "/drift",
       content:
-        "Inspects live endpoints with network timing traces and compares service readiness against surge traffic requirements.",
+        "Automatically compares live Docker container configs against your official GitHub Dockerfile or Compose spec to flag manual hotfixes.",
     },
     {
       icon: <Terminal size={28} strokeWidth={1.5} />,
@@ -70,28 +70,6 @@ export default function Home() {
   return (
     <div className="w-full min-h-screen bg-white text-black flex pl-12 sm:pl-16 md:pl-16 lg:pl-18">
       <main className="w-full flex flex-col items-center overflow-x-hidden p-6 md:p-12 lg:p-20">
-        <style>{`
-          @keyframes reveal {
-            from {
-              opacity: 0;
-              transform: translateY(100%);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-          .animate-reveal {
-            animation: reveal 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-          }
-          @media (prefers-reduced-motion: reduce) {
-            .animate-reveal {
-              animation: none;
-              opacity: 1 !important;
-              transform: none !important;
-            }
-          }
-        `}</style>
         <h1
           aria-label={text}
           className="mt-10 md:mt-14 text-2xl sm:text-4xl md:text-6xl lg:text-7xl text-black font-orbitron font-semibold md:font-extrabold text-center leading-tight"

@@ -22,6 +22,8 @@ const nextConfig: NextConfig = {
   
   turbopack: {},
 
+  serverExternalPackages: ['dockerode'],
+
   outputFileTracingIncludes: {
     '/api/monitor/ping': ['./protos/**/*'],
   },
